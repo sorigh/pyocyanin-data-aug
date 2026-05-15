@@ -10,7 +10,7 @@ dependencies = [
     "nbformat>=5.10.4",
     "numpy>=2.4.3",
     "openpyxl>=3.1.5",
-    "pandas>=3.0.1",
+    "pandas>=2.2.3, <3.0.0",
     "plotly>=6.6.0",
     "scikit-learn>=1.8.0",
     "scipy>=1.17.1",
@@ -18,4 +18,6 @@ dependencies = [
     "xgboost>=3.2.0",
     "pywavelets>=1.8.0",
     "scikit-optimize>=0.10.2",
+    "torch>=2.6.0",
+    "sdv>=1.36.0",
 ]
