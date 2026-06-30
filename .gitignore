@@ -208,3 +208,9 @@ __marimo__/
 
 datasets
 vectorized
+
+# Data and results
+augmentation_ablation_results.csv
+augmentation_ablation_results_all_suites.csv
+full_range_ablation_results_refined.csv
+raw/
