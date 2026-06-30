@@ -407,8 +407,53 @@ def compute_stratified_swd(
     return per_class_swd, mean_swd, max_swd
 
 
+def _estimate_wasserstein_null_floor(
+    big_pool: np.ndarray, 
+    n_small: int, 
+    n_big: int, 
+    n_boot: int, 
+    seed: int
+) -> float:
+    """
+    Estimate the null floor of Wasserstein distance via bootstrap resampling.
+    Reasoning:
+    When comparing a small real dataset (e.g. 2 points) to a much larger 
+    synthetic dataset (e.g. 40 points), the linear interpolation of the small sample
+    has a over simplified "geometry" compared to the larger sample. (a line compared to a curve).
+     
+    This causes an artificially high Wasserstein distance, even if both sets 
+    describe the same baisc distribution.
+    
+    To correct this, I repeatedly resample (extract a small sample from the big dataset,
+    interpolate it onto the larger grid, and measure the distance to the full distribution (full dataset)) 
+    and take the median of the resulting distances.
+    """
+    if n_big < 8 or n_boot <= 0:
+        return 0.0
+
+    rng = np.random.default_rng(seed)
+    boot_vals = np.empty(n_boot)
+    big_grid = np.linspace(0, 1, n_big)
+    small_grid = np.linspace(0, 1, n_small)
+
+    for i in range(n_boot):
+        # Extract a bootstrap sample of size n_small from the big_pool
+        resample = np.sort(rng.choice(big_pool, size=n_small, replace=True))
+        
+        # Interpolate the resampled points onto the larger grid
+        interp_b = np.interp(big_grid, small_grid, resample)
+        
+        # Measure the distance (which would be 0 in ideal conditions, but isn't in practice)
+        boot_vals[i] = np.mean(np.abs(np.sort(big_pool) - interp_b))
+
+    return float(np.median(boot_vals))
+
 # Section 4 - Tier 2 physics-anchored metrics
-def compute_normalised_wasserstein(p_arr: np.ndarray, q_arr: np.ndarray) -> float:
+def compute_normalised_wasserstein(
+    p_arr: np.ndarray,
+    q_arr: np.ndarray,
+    seed: int = 42,
+    ) -> float:
     """
     Normalised Wasserstein-1 distance (replaces histogram Hellinger;
     interpolate the SMALLER sample onto the LARGER sample's quantile
@@ -417,9 +462,10 @@ def compute_normalised_wasserstein(p_arr: np.ndarray, q_arr: np.ndarray) -> floa
     the first-passed array (often n_real=2-6) was the smaller one.
 
     Valid even at n = 3 (exact sort-based W1 vs. Hellinger which needs n ≥ 20).
-    Normalised by pooled standard deviation → dimensionless, comparable across
+    Normalised by pooled standard deviation -> dimensionless, comparable across
     feature scales.
     """
+    debias_n_boot = 500
     p_sorted = np.sort(p_arr.astype(float))
     q_sorted = np.sort(q_arr.astype(float))
     n_p, n_q = len(p_sorted), len(q_sorted)
@@ -431,7 +477,13 @@ def compute_normalised_wasserstein(p_arr: np.ndarray, q_arr: np.ndarray) -> floa
             big, big_pts = q_sorted, np.linspace(0, 1, n_q)
             small, small_pts = p_sorted, np.linspace(0, 1, n_p)
         small_interp = np.interp(big_pts, small_pts, small)
-        w1 = float(np.mean(np.abs(big - small_interp)))
+        w1_raw = float(np.mean(np.abs(big - small_interp)))
+
+        n_small, n_big = min(n_p, n_q), max(n_p, n_q)
+        big_pool = q_sorted if n_q >= n_p else p_sorted
+        
+        null_floor = _estimate_wasserstein_null_floor(big_pool, n_small, n_big, debias_n_boot, seed)
+        w1 = max(0.0, w1_raw - null_floor)
     else:
         w1 = float(np.mean(np.abs(p_sorted - q_sorted)))
     pooled_std = float(np.std(np.concatenate([p_arr, q_arr]), ddof=1))
