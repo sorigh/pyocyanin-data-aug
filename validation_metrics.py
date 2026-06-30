@@ -410,7 +410,11 @@ def compute_stratified_swd(
 # Section 4 - Tier 2 physics-anchored metrics
 def compute_normalised_wasserstein(p_arr: np.ndarray, q_arr: np.ndarray) -> float:
     """
-    Normalised Wasserstein-1 distance (FIX-H - replaces histogram Hellinger).
+    Normalised Wasserstein-1 distance (replaces histogram Hellinger;
+    interpolate the SMALLER sample onto the LARGER sample's quantile
+    grid, regardless of argument order. The old code always built the grid
+    from p_arr, which degenerated to a 2-point min/max comparison whenever
+    the first-passed array (often n_real=2-6) was the smaller one.
 
     Valid even at n = 3 (exact sort-based W1 vs. Hellinger which needs n ≥ 20).
     Normalised by pooled standard deviation → dimensionless, comparable across
@@ -420,10 +424,14 @@ def compute_normalised_wasserstein(p_arr: np.ndarray, q_arr: np.ndarray) -> floa
     q_sorted = np.sort(q_arr.astype(float))
     n_p, n_q = len(p_sorted), len(q_sorted)
     if n_p != n_q:
-        q_pts    = np.linspace(0, 1, n_q)
-        p_pts    = np.linspace(0, 1, n_p)
-        q_interp = np.interp(p_pts, q_pts, q_sorted)
-        w1 = float(np.mean(np.abs(p_sorted - q_interp)))
+        if n_p >= n_q:
+            big, big_pts = p_sorted, np.linspace(0, 1, n_p)
+            small, small_pts = q_sorted, np.linspace(0, 1, n_q)
+        else:
+            big, big_pts = q_sorted, np.linspace(0, 1, n_q)
+            small, small_pts = p_sorted, np.linspace(0, 1, n_p)
+        small_interp = np.interp(big_pts, small_pts, small)
+        w1 = float(np.mean(np.abs(big - small_interp)))
     else:
         w1 = float(np.mean(np.abs(p_sorted - q_sorted)))
     pooled_std = float(np.std(np.concatenate([p_arr, q_arr]), ddof=1))
@@ -1212,7 +1220,13 @@ class ValidationGate:
 
         # Mean normalised W1 across PFF features (for VFI)
         if 'pff_df' in results and not results['pff_df'].empty:
-            mean_feat_w1 = float(results['pff_df']['Wasserstein'].dropna().mean())
+            per_class_w1 = (
+            results['pff_df']
+            .dropna(subset=['Wasserstein'])
+            .groupby('class_uM')['Wasserstein']
+            .mean()
+            )
+            mean_feat_w1 = float(per_class_w1.median()) if len(per_class_w1) else 0.0
         else:
             mean_feat_w1 = 0.0
         results['mean_feat_w1'] = mean_feat_w1
@@ -1234,7 +1248,7 @@ class ValidationGate:
     @classmethod
     def from_csv(cls, path_potential_grid: str, path_signals_real: str, target_col: str = 'concentration'):
         """
-        Inițializează ValidationGate citind direct de pe disc fișierele CSV.
+        Create a ValidationGate instance from CSV files.
         """
         # Potential axis (E)
         # It is assumed that the CSV contains a single column of potentials (V) in ascending order.
