@@ -20,5 +20,6 @@ dependencies = [
     "scikit-optimize>=0.10.2",
     "torch>=2.6.0",
     "sdv>=1.36.0",
-    "POT>=0.9.5"
+    "POT>=0.9.5",
+    "streamlit>=1.58.0",
 ]
