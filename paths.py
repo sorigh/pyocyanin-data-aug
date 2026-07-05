@@ -32,32 +32,42 @@ VECTORIZED_EXPERIMENTAL_CSV = VECTORIZED_DIR / 'experimental.csv'
 VECTORIZED_CORE_CSV = VECTORIZED_DIR / 'core.csv'
 VECTORIZED_EXTENDED_CSV = VECTORIZED_DIR / 'extended.csv'
 
-# GAN checkpoints/samples/logs
-GAN_OUTPUT_DIR = ROOT / 'gan_output'
-TIMEGAN_SIGNALS_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_real' / 'timegan_signals.csv'
-WGANGP_SIGNALS_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_real' / 'wgangp_signals.csv'
-TIMEGAN_SIGNALS_TRAINED_COMBINED_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_combined' / 'timegan_signals.csv'
-WGANGP_SIGNALS_TRAINED_COMBINED_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_combined' / 'wgangp_signals.csv'
-
 # trained regressor bundles (export_models.py output, used in
 # pages/Model_Training_Testing.py)
 MODELS_DIR = ROOT / 'models'
-FEATURE_METADATA_JSON = MODELS_DIR / 'feature_metadata.json'
+REGRESSORS_DIR = MODELS_DIR / 'regressors'
+FEATURE_METADATA_JSON = REGRESSORS_DIR / 'feature_metadata.json'
+TUNED_MLP_STATE_DICT = REGRESSORS_DIR / 'mlp_tuned.pt'
+TUNED_MLP_SCALER = REGRESSORS_DIR / 'mlp_scaler.joblib'
+TUNED_CNN_STATE_DICT = REGRESSORS_DIR / 'cnn_tuned.pt'
 
-# Tuning script outputs (training/tune_ml_hparams.py,
-# training/tune_dl_hparams.py) used in
-# model_registry.py and export_models.py
+# GAN checkpoints (models)
+GAN_MODELS_DIR = MODELS_DIR / 'gan'
+GAN_MODEL_DIR_REAL = GAN_MODELS_DIR / 'real'
+GAN_MODEL_DIR_COMBINED = GAN_MODELS_DIR / 'combined'
+
+# GAN-generated sample batches (data)
+GAN_SAMPLES_DIR = ROOT / 'data' / 'generated' / 'gan'
+TIMEGAN_SIGNALS_CSV = GAN_SAMPLES_DIR / 'real' / 'timegan_signals.csv'
+WGANGP_SIGNALS_CSV = GAN_SAMPLES_DIR / 'real' / 'wgangp_signals.csv'
+TIMEGAN_SIGNALS_TRAINED_COMBINED_CSV = GAN_SAMPLES_DIR / 'combined' / 'timegan_signals.csv'
+WGANGP_SIGNALS_TRAINED_COMBINED_CSV = GAN_SAMPLES_DIR / 'combined' / 'wgangp_signals.csv'
+
+# GAN training logs
+GAN_LOGS_DIR = ROOT / 'logs' / 'gan'
+TIMEGAN_LOG_REAL_CSV = GAN_LOGS_DIR / 'real' / 'timegan_training_history.csv'
+WGANGP_LOG_REAL_CSV = GAN_LOGS_DIR / 'real' / 'wgangp_training_history.csv'
+TIMEGAN_LOG_COMBINED_CSV = GAN_LOGS_DIR / 'combined' / 'timegan_training_history.csv'
+WGANGP_LOG_COMBINED_CSV = GAN_LOGS_DIR / 'combined' / 'wgangp_training_history.csv'
+
+# Ablation / evaluation results (data_augmentation.ipynb / full_range_data_augmentation.ipynb)
 RESULTS_DIR = ROOT / 'results'
-RESULTS_MODELS_DIR = RESULTS_DIR / 'models'
 MODEL_EVALUATION_RESULTS_CSV = RESULTS_DIR / 'model_evaluation_results.csv'
-TUNED_MLP_STATE_DICT = RESULTS_MODELS_DIR / 'mlp_tuned.pt'
-TUNED_MLP_SCALER = RESULTS_MODELS_DIR / 'mlp_scaler.joblib'
-TUNED_CNN_STATE_DICT = RESULTS_MODELS_DIR / 'cnn_tuned.pt'
-
-# Ablation study results (data_augmentation.ipynb / full_range_data_augmentation.ipynb)
 AUGMENTATION_ABLATION_RESULTS_CSV = RESULTS_DIR / 'augmentation_ablation_results.csv'
 FULL_RANGE_ABLATION_RESULTS_CSV = RESULTS_DIR / 'full_range_ablation_results_refined.csv'
 
 # logs
 LOGS_DIR = ROOT / 'logs'
+TUNE_DL_HPARAMS_STUDIES_CSV = LOGS_DIR / 'tune_dl_hparams_studies.csv'
+SVR_XGB_NESTED_CV_CSV = LOGS_DIR / 'svr_xgb_nested_cv.csv'
 

@@ -1,8 +1,10 @@
 """On-the-fly signal generation from the pre-trained TimeGAN / WGAN-GP checkpoints.
 
 The training scripts under `training/` are batch jobs: they train, save a
-checkpoint and dump one fixed sample batch to `gan_output/samples_*`. This
-module instead loads the saved generator weights and lets a caller (the
+checkpoint and dump one fixed sample batch (conventionally under
+`models/gan/{real,combined}/` for checkpoints and `data/generated/gan/{real,combined}/`
+for the sample batch). This module instead loads the saved generator weights
+and lets a caller (the
 "Data Generation" Streamlit page) draw an arbitrary number of fresh signals
 at request time, so the GAN stops being a static comparison overlay and
 becomes a real data source a user can size on demand.

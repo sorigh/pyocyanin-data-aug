@@ -34,7 +34,9 @@ from model_registry import MODEL_LABELS, RAW_SIGNAL_MODELS, predict, train_model
 from plot_style import apply_default_plotly_layout
 from voltammogram_signal import Signal
 
-PRETRAINED_MODELS_DIR = 'models'
+import paths
+
+PRETRAINED_MODELS_DIR = paths.REGRESSORS_DIR
 RECOMMENDED = AugmentationConfig()
 FOOLED_PCT_THRESHOLD = 40.0
 BORDERLINE_PCT_THRESHOLD = 15.0
@@ -503,7 +505,7 @@ def render_testing_module(sources: dict) -> None:
 
 # Section 4 - page entry point
 def main() -> None:
-    st.title('🧪 Model Training & Testing')
+    st.title(' Model Training & Testing')
     st.caption('Choose exactly what data and feature suite a model learns from, then test it '
                'transparently against a whole dataset or a single hand-tuned signal.')
 

@@ -44,17 +44,17 @@ CONCENTRATIONS_uM = [
 REPRESENTATIVE_CONCENTRATIONS_uM = [0.1, 0.5, 2.5, 10.0, 25.0, 75.0]
 
 # Pre-generated static sample batches - used only as the Page 1 comparison
-# overlay against the physics-augmented batch (unchanged legacy behaviour).
+# overlay against the physics-augmented batch
 GAN_SAMPLE_DIRS = {
-    'Trained on Real data': paths.GAN_OUTPUT_DIR / 'samples_trained_on_real',
-    'Trained on Combined (real + physics-aug) data': paths.GAN_OUTPUT_DIR / 'samples_trained_on_combined',
+    'Trained on Real data': paths.GAN_SAMPLES_DIR / 'real',
+    'Trained on Combined (real + physics-aug) data': paths.GAN_SAMPLES_DIR / 'combined',
 }
 
 # Saved generator checkpoints - used by `gan_inference.py` to draw fresh
 # signals on demand from the "Generate GAN data" menu.
 GAN_MODEL_DIRS = {
-    'Trained on Real data': paths.GAN_OUTPUT_DIR / 'models_trained_on_real',
-    'Trained on Combined (real + physics-aug) data': paths.GAN_OUTPUT_DIR / 'models_trained_on_combined',
+    'Trained on Real data': paths.GAN_MODEL_DIR_REAL,
+    'Trained on Combined (real + physics-aug) data': paths.GAN_MODEL_DIR_COMBINED,
 }
 
 SOURCE_LABELS = {

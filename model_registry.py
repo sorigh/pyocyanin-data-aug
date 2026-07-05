@@ -7,8 +7,8 @@ training on whatever data/feature-suite the user picks).
 "Ablation Study") - see `export_models.py`'s docstring for why.
 
 'svr' / 'xgboost_tuned' / 'mlp' / 'cnn' hyperparameters are copied verbatim
-from `results/models/svr_xgb_best_params.json` and
-`results/models/mlp_cnn_best_params.json` - the outputs of
+from `models/regressors/svr_xgb_best_params.json` and
+`models/regressors/mlp_cnn_best_params.json` - the outputs of
 `training/tune_ml_hparams.py` (nested LOOCV + skopt.BayesSearchCV) and
 `training/tune_dl_hparams.py` (Optuna) respectively. They're hardcoded here,
 not read from those JSON files at import time, so that re-running the tuning
@@ -55,7 +55,7 @@ MODEL_LABELS = {
 # feature suite. Everything else in MODEL_LABELS is a tabular model.
 RAW_SIGNAL_MODELS = {'cnn'}
 
-# From results/models/svr_xgb_best_params.json ('svr'.best_params / 'xgboost'.best_params)
+# From models/regressors/svr_xgb_best_params.json ('svr'.best_params / 'xgboost'.best_params)
 _SVR_BEST_PARAMS = dict(C=868.4208570619496, epsilon=0.0022767724858461062, gamma=0.0001)
 _XGB_TUNED_BEST_PARAMS = dict(
     n_estimators=500, max_depth=3, learning_rate=0.0501746552420551,
@@ -63,7 +63,7 @@ _XGB_TUNED_BEST_PARAMS = dict(
     gamma=7.160304412758296e-05, reg_alpha=8.493583217951526e-06, reg_lambda=0.011728497290648301,
 )
 
-# From results/models/mlp_cnn_best_params.json. The MLP was re-tuned after
+# From models/regressors/mlp_cnn_best_params.json. The MLP was re-tuned after
 # an initial run trained on raw, unstandardized features (peak_FWHM ~0.05 vs
 # wavelet_energy ~1e6) collapsed to predicting a constant regardless of
 # input - see the "must standardize" note on MLPWrapper below.

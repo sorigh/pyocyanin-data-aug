@@ -27,13 +27,13 @@ training/tune_dl_hparams.py (Optuna). Both scripts' hyperparameters are
 hardcoded into model_registry.py (see that module's docstring for why) - this
 script just fits/loads models using those factories. MLP and CNN specifically
 *load* training/tune_dl_hparams.py's already-trained weights
-(results/models/{mlp,cnn}_tuned.pt) rather than refitting: that run already
+(models/regressors/{mlp,cnn}_tuned.pt) rather than refitting: that run already
 trained on the exact same real data this script would otherwise retrain on,
 so reusing it is free and reproduces exactly the model whose metrics are in
-results/models/mlp_cnn_best_params.json.
+models/regressors/mlp_cnn_best_params.json.
 
-Models are trained on every real calibration replicate - `vectorized/experimental.csv`
-(40 rows, engineered features) for the tabular models, `raw/raw_signals_real.csv`
+Models are trained on every real calibration replicate - `data/vectorized/experimental.csv`
+(40 rows, engineered features) for the tabular models, `data/raw/raw_signals_real.csv`
 (40 rows, raw signal) for the 1D-CNN - not on any augmented/synthetic data,
 since the whole point of the Testing page is to see how a real-data-only
 model responds to signals it has never seen.
@@ -58,14 +58,14 @@ from model_registry import MODEL_FACTORIES, RAW_SIGNAL_MODELS
 import paths
 VECTORIZED_EXPERIMENTAL_CSV = paths.VECTORIZED_EXPERIMENTAL_CSV
 RAW_SIGNALS_REAL_CSV = paths.REAL_SIGNALS_CSV
-MODELS_DIR = 'models'
+MODELS_DIR = paths.REGRESSORS_DIR
 
 # Where training/tune_dl_hparams.py dropped its checkpoints when last run.
 # Only the weights (and, for the MLP, the feature scaler) are read from here
 # - the hyperparameters that produced them are hardcoded into model_registry.py.
-TUNED_MLP_STATE_DICT = 'results/models/mlp_tuned.pt'
-TUNED_MLP_SCALER = 'results/models/mlp_scaler.joblib'
-TUNED_CNN_STATE_DICT = 'results/models/cnn_tuned.pt'
+TUNED_MLP_STATE_DICT = paths.TUNED_MLP_STATE_DICT
+TUNED_MLP_SCALER = paths.TUNED_MLP_SCALER
+TUNED_CNN_STATE_DICT = paths.TUNED_CNN_STATE_DICT
 
 FEATURE_SUITE = 'experimental'
 FEATURE_COLUMNS = FEATURE_COLUMNS_BY_SUITE[FEATURE_SUITE]
