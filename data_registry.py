@@ -1,20 +1,17 @@
-"""Single source of truth for every dataset the two Streamlit pages can see.
+"""
+
+Single source of truth for every dataset the two Streamlit pages can see.
 
 Two kinds of sources are exposed through the same `get_available_sources()`
 catalog:
 
 - Static, always-available sources loaded from disk (`real`,
-  `stable_augmented`) - cached with `st.cache_data` since the underlying
-  files never change during a session.
+  `stable_augmented`) - cached with `st.cache_data`.
 - Session-scoped sources (`custom_generated`, `gan_generated`) written by the
   "Data Generation" page into `st.session_state['datasets']` and read back
-  here. They only appear once the user has actually generated them, which is
-  what lets the "Model Training & Testing" page offer the exact dataset the
-  user just built on the other page.
+  here. They only appear once the user generates them.
 
-Keeping this in one module (instead of importing from `app.py`) is what lets
-`app.py` stay a pure router: neither page imports from the other or from
-`app.py` anymore.
+  
 """
 
 from __future__ import annotations
@@ -27,11 +24,13 @@ import streamlit as st
 
 from augmentation_pipeline import AugmentedDataset, FEATURE_COLUMNS_BY_SUITE, FeatureVectorizer, FullRangeDataAugmentor
 
-# Section 0 - static configuration
-DATASET_PATH = 'datasets/Standard calibration in culture media_extended.xlsx'
-POTENTIAL_GRID_PATH = 'raw/raw_potential_grid.csv'
-REAL_SIGNALS_PATH = 'raw/raw_signals_real.csv'
-STABLE_AUGMENTED_PATH = 'raw/raw_signals_augmented.csv'
+# Section 0 - configuration
+import paths
+
+DATASET_PATH = paths.CALIBRATION_WORKBOOK
+POTENTIAL_GRID_PATH = paths.POTENTIAL_GRID_CSV
+REAL_SIGNALS_PATH = paths.REAL_SIGNALS_CSV
+STABLE_AUGMENTED_PATH = paths.AUGMENTED_SIGNALS_CSV
 
 # Replicate labels for the calibration workbook columns (same list used by
 # full_range_data_augmentation.ipynb and data_analysis.ipynb).

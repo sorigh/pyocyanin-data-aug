@@ -49,6 +49,7 @@ FEATURE_METADATA_JSON = MODELS_DIR / 'feature_metadata.json'
 # model_registry.py and export_models.py
 RESULTS_DIR = ROOT / 'results'
 RESULTS_MODELS_DIR = RESULTS_DIR / 'models'
+MODEL_EVALUATION_RESULTS_CSV = RESULTS_DIR / 'model_evaluation_results.csv'
 TUNED_MLP_STATE_DICT = RESULTS_MODELS_DIR / 'mlp_tuned.pt'
 TUNED_MLP_SCALER = RESULTS_MODELS_DIR / 'mlp_scaler.joblib'
 TUNED_CNN_STATE_DICT = RESULTS_MODELS_DIR / 'cnn_tuned.pt'

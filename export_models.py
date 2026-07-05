@@ -55,8 +55,9 @@ from sklearn.impute import SimpleImputer
 from augmentation_pipeline import FEATURE_COLUMNS_BY_SUITE
 from model_registry import MODEL_FACTORIES, RAW_SIGNAL_MODELS
 
-VECTORIZED_EXPERIMENTAL_CSV = 'vectorized/experimental.csv'
-RAW_SIGNALS_REAL_CSV = 'raw/raw_signals_real.csv'
+import paths
+VECTORIZED_EXPERIMENTAL_CSV = paths.VECTORIZED_EXPERIMENTAL_CSV
+RAW_SIGNALS_REAL_CSV = paths.REAL_SIGNALS_CSV
 MODELS_DIR = 'models'
 
 # Where training/tune_dl_hparams.py dropped its checkpoints when last run.
