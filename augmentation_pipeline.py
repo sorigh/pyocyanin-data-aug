@@ -363,6 +363,8 @@ class AugmentedDataset:
 
 
 # Section 8 - Feature vectorization (core / extended / experimental suites)
+SIGNAL_LEN = 229  # shared with training/timegan_training.py, training/wgangp_training.py, torch_models.py
+
 FEATURE_COLUMNS_BY_SUITE = {
     'core': ['peak_current', 'peak_potential', 'peak_AUC', 'peak_FWHM'],
     'extended': ['peak_current', 'peak_potential', 'peak_AUC', 'peak_FWHM',
@@ -374,6 +376,13 @@ FEATURE_COLUMNS_BY_SUITE = {
                       'peak_kurtosis', 'tchebichef_curve_moments', 'mean_peak',
                       'signal_entropy', 'spectral_entropy', 'fft_power',
                       'pca2_comp', 'pca3_comp', 'wavelet_energy'],
+    # Not an engineered feature suite - the raw I(E) samples themselves, for
+    # the 1D-CNN (torch_models.CNN1DRegressor), which trains on the signal
+    # directly rather than on extracted peak/shape statistics. Kept in this
+    # dict (rather than as a special case scattered through call sites) so
+    # `data_registry.featurize()` and the Streamlit pages can treat it as
+    # just another suite with its own column list.
+    'raw_signal': [f'I_{i}' for i in range(SIGNAL_LEN)],
 }
 
 

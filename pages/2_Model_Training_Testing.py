@@ -28,7 +28,9 @@ from scipy.spatial.distance import pdist, squareform
 
 import data_registry as dr
 from augmentation_pipeline import AugmentationConfig, FEATURE_COLUMNS_BY_SUITE, FeatureVectorizer, SignalAugmentor
-from model_registry import MODEL_LABELS, predict, train_models
+
+
+from model_registry import MODEL_LABELS, RAW_SIGNAL_MODELS, predict, train_models
 from plot_style import apply_default_plotly_layout
 from voltammogram_signal import Signal
 
@@ -40,14 +42,24 @@ LEAKAGE_NN_SAMPLE_CAP = 800  # bound the O(n^2) leave-one-out distance computati
 
 
 # Section 1 - pretrained baseline bundle (models/*.joblib, from export_models.py)
+#
+# A bundle's models don't all share one feature representation any more:
+# every model in MODEL_LABELS except 'cnn' consumes an engineered feature
+# suite (core/extended/experimental), while 'cnn' (RAW_SIGNAL_MODELS) consumes
+# the raw 229-point signal instead. So `feature_columns`, `imputers` and
+# `train_features` are all dicts keyed by suite name, and `model_suites`
+# says which suite each model in the bundle actually uses -
+# `bundle['feature_columns'][bundle['model_suites'][model_name]]` is the
+# pattern every call site below uses to get "the right suite for this model".
 @st.cache_resource(show_spinner=False)
 def load_pretrained_model(name: str):
     return joblib.load(f'{PRETRAINED_MODELS_DIR}/{name}.joblib')
 
 
 @st.cache_resource(show_spinner=False)
-def load_pretrained_imputer():
-    return joblib.load(f'{PRETRAINED_MODELS_DIR}/feature_imputer.joblib')
+def load_pretrained_imputer(suite: str):
+    filename = 'raw_signal_imputer' if suite == 'raw_signal' else 'feature_imputer'
+    return joblib.load(f'{PRETRAINED_MODELS_DIR}/{filename}.joblib')
 
 
 @st.cache_data(show_spinner=False)
@@ -59,20 +71,24 @@ def load_pretrained_feature_metadata() -> dict:
 def build_pretrained_baseline_bundle(sources: dict) -> dict | None:
     try:
         meta = load_pretrained_feature_metadata()
-        imputer = load_pretrained_imputer()
         models = {name: load_pretrained_model(name) for name in MODEL_LABELS}
     except FileNotFoundError:
         return None
 
-    suite = meta['feature_suite']
+    model_suites = meta['model_suites']
+    feature_columns = meta['feature_columns']
+    suites_in_use = sorted(set(model_suites.values()))
+    imputers = {suite: load_pretrained_imputer(suite) for suite in suites_in_use}
+
     real = sources['real']
-    train_features = dr.featurize(real['E'], real['X'], real['y'], suite=suite)
+    train_features = {suite: dr.featurize(real['E'], real['X'], real['y'], suite=suite)
+                       for suite in suites_in_use}
+
     return dict(
-        run_id='pretrained_baseline', models=models, imputer=imputer,
-        feature_columns=meta['feature_columns'], suite=suite,
+        run_id='pretrained_baseline', models=models, model_suites=model_suites,
+        feature_columns=feature_columns, imputers=imputers, train_features=train_features,
         train_source_keys=['real'], train_source_labels=[real['label']],
-        n_train=real['n'], train_features=train_features,
-        trained_at='pre-exported (export_models.py)')
+        n_train=real['n'], trained_at='pre-exported (export_models.py)')
 
 
 def init_trained_runs(sources: dict) -> None:
@@ -105,10 +121,13 @@ def render_training_module(sources: dict) -> None:
         'Feature suite', options=['core', 'extended', 'experimental'], index=0,
         help='core: peak current/potential/AUC/FWHM only (4 features). extended: + PCA1 and first/'
              'second derivative extrema (7). experimental: + 16 additional shape, statistical and '
-             'spectral features (23). Defaults to core.')
+             'spectral features (23). Defaults to core. Ignored by 1D-CNN, which always trains on '
+             'the raw signal regardless of this choice.')
 
     model_keys = st.multiselect('Algorithms to train', options=list(MODEL_LABELS), default=list(MODEL_LABELS),
                                  format_func=lambda k: MODEL_LABELS[k])
+    if any(k in RAW_SIGNAL_MODELS for k in model_keys):
+        st.caption('1D-CNN ignores the feature suite above - it always trains on the raw 229-point signal.')
 
     unavailable = [k for k in selected_keys if not sources[k]['available']]
     if unavailable:
@@ -128,23 +147,43 @@ def render_training_module(sources: dict) -> None:
                 feat_df = dr.featurize(E, X, y, suite=suite)
                 feature_columns = FEATURE_COLUMNS_BY_SUITE[suite]
                 X_feat, y_feat = feat_df[feature_columns], feat_df['concentration']
-                models, imputer = train_models(X_feat, y_feat, model_keys)
+
+                needs_raw_signal = any(k in RAW_SIGNAL_MODELS for k in model_keys)
+                raw_feat_df, X_raw_feat = None, None
+                if needs_raw_signal:
+                    raw_feat_df = dr.featurize(E, X, y, suite='raw_signal')
+                    X_raw_feat = raw_feat_df[FEATURE_COLUMNS_BY_SUITE['raw_signal']]
+
+                models, imputer, raw_signal_imputer = train_models(
+                    X_feat, y_feat, model_keys, X_raw_signal=X_raw_feat)
+
+            model_suites = {k: ('raw_signal' if k in RAW_SIGNAL_MODELS else suite) for k in model_keys}
+            feature_columns_by_suite = {suite: feature_columns}
+            imputers = {suite: imputer}
+            train_features = {suite: feat_df}
+            if needs_raw_signal:
+                feature_columns_by_suite['raw_signal'] = FEATURE_COLUMNS_BY_SUITE['raw_signal']
+                imputers['raw_signal'] = raw_signal_imputer
+                train_features['raw_signal'] = raw_feat_df
 
             run_id = f'run_{len(st.session_state["trained_runs"])}'
             st.session_state['trained_runs'][run_id] = dict(
-                run_id=run_id, models=models, imputer=imputer, feature_columns=feature_columns,
-                suite=suite, train_source_keys=usable_keys,
+                run_id=run_id, models=models, model_suites=model_suites,
+                feature_columns=feature_columns_by_suite, imputers=imputers, train_features=train_features,
+                train_source_keys=usable_keys,
                 train_source_labels=[sources[k]['label'] for k in usable_keys],
-                n_train=len(y_feat), train_features=feat_df,
+                n_train=len(y_feat),
                 trained_at=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             st.session_state['active_run_id'] = run_id
             st.success(f'Trained {len(models)} model(s) on {len(y_feat)} samples '
-                       f'({", ".join(sources[k]["label"] for k in usable_keys)}), {suite} suite.')
+                       f'({", ".join(sources[k]["label"] for k in usable_keys)}), {suite} suite'
+                       + (' + raw signal for 1D-CNN' if needs_raw_signal else '') + '.')
 
     runs = st.session_state['trained_runs']
     if len(runs) > 1:
         st.caption('Bundles trained this session:')
-        rows = [dict(run=rid, trained_at=b['trained_at'], suite=b['suite'], n_train=b['n_train'],
+        rows = [dict(run=rid, trained_at=b['trained_at'],
+                      suite=', '.join(sorted(set(b['model_suites'].values()))), n_train=b['n_train'],
                       trained_on=', '.join(b['train_source_labels']))
                 for rid, b in runs.items()]
         st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
@@ -196,11 +235,12 @@ def plot_history_parity(history_df: pd.DataFrame) -> go.Figure:
 
 def render_transparency_card(bundle: dict, model_name: str) -> None:
     st.subheader('What was this model trained on?')
+    suite = bundle['model_suites'][model_name]
     cols = st.columns(4)
     cols[0].metric('Algorithm', MODEL_LABELS.get(model_name, model_name))
-    cols[1].metric('Feature suite', bundle['suite'])
+    cols[1].metric('Feature suite', suite)
     cols[2].metric('Training samples', bundle['n_train'])
-    cols[3].metric('# features', len(bundle['feature_columns']))
+    cols[3].metric('# features', len(bundle['feature_columns'][suite]))
     st.caption('Trained on: ' + ', '.join(bundle['train_source_labels']))
 
 
@@ -217,10 +257,13 @@ def render_dataset_test(bundle: dict, model_name: str, sources: dict) -> None:
 
     if st.button('Run test on this dataset', type='primary'):
         s = sources[test_key]
-        feat_df = dr.featurize(s['E'], s['X'], s['y'], suite=bundle['suite'])
-        X_feat = feat_df[bundle['feature_columns']]
+        suite = bundle['model_suites'][model_name]
+        feature_columns = bundle['feature_columns'][suite]
+        imputer = bundle['imputers'][suite]
+        feat_df = dr.featurize(s['E'], s['X'], s['y'], suite=suite)
+        X_feat = feat_df[feature_columns]
         y_true = feat_df['concentration'].to_numpy(dtype=float)
-        y_pred = predict(bundle['models'][model_name], bundle['imputer'], X_feat)
+        y_pred = predict(bundle['models'][model_name], imputer, X_feat)
         st.session_state['dataset_test_result'] = dict(
             test_key=test_key, y_true=y_true, y_pred=y_pred,
             metrics=compute_regression_metrics(y_true, y_pred), feat_df=feat_df)
@@ -297,8 +340,16 @@ def generate_and_extract(target_c: float, config: AugmentationConfig, augmentor,
     Signal.set_common_potential_E(augmentor.calibration.potential_grid_V)
     Signal.set_common_baseline_I(np.array([]))  # anchor curves (and thus I) are already baseline-subtracted
     try:
-        sig = Signal(I)
-        feature_vector = FeatureVectorizer.vectorize(sig, suite=suite)
+        sig = Signal(I)  # still needed for the peak plot regardless of suite
+        if suite == 'raw_signal':
+            # The 1D-CNN trains directly on raw/raw_signals_real.csv's values
+            # (see data_registry.featurize's 'raw_signal' branch) - Signal's
+            # constructor Savitzky-Golay-smooths self.I for peak detection,
+            # so using that here instead of the true raw I would be a
+            # train/inference mismatch.
+            feature_vector = I.tolist()
+        else:
+            feature_vector = FeatureVectorizer.vectorize(sig, suite=suite)
     finally:
         Signal.set_common_baseline_I(augmentor.calibration.blank_baseline_uA)
     return I, sig, feature_vector
@@ -317,7 +368,8 @@ def plot_generated_signal(E: np.ndarray, I: np.ndarray, peak) -> go.Figure:
     return apply_default_plotly_layout(fig, title_text='Manually augmented test signal')
 
 
-def check_single_signal_leakage(feature_vector: list, target_c: float, bundle: dict) -> tuple[bool, str]:
+def check_single_signal_leakage(feature_vector: list, target_c: float, bundle: dict, model_name: str
+                                 ) -> tuple[bool, str]:
     """Nearest-neighbour-in-feature-space + exact-concentration leakage check.
 
     Flags the manually generated signal as a likely leak if either (a) its
@@ -325,9 +377,15 @@ def check_single_signal_leakage(feature_vector: list, target_c: float, bundle: d
     (b) it sits closer to some training row than that training set's own
     typical (25th-percentile) nearest-neighbour distance - i.e. it looks like
     an unremarkable member of the training set rather than an independent probe.
+
+    Runs in whichever representation `model_name` actually uses (engineered
+    features, or the raw 229-point signal for 'cnn') - the z-scored distance
+    check is dimension-agnostic, so no special-casing needed beyond picking
+    the right suite's train_features/feature_columns.
     """
-    train_features = bundle['train_features']
-    feature_columns = bundle['feature_columns']
+    suite = bundle['model_suites'][model_name]
+    train_features = bundle['train_features'][suite]
+    feature_columns = bundle['feature_columns'][suite]
     X_train = train_features[feature_columns].to_numpy(dtype=float)
 
     concentrations = train_features['concentration'].to_numpy(dtype=float)
@@ -363,17 +421,21 @@ def render_single_signal_test(bundle: dict, model_name: str) -> None:
     augmentor = dr.load_augmentor()
     target_c, config, generate_clicked = render_manual_augmentation_controls()
 
-    state_key = f"single_signal_{bundle['run_id']}_{bundle['suite']}"
+    suite = bundle['model_suites'][model_name]
+    feature_columns = bundle['feature_columns'][suite]
+    imputer = bundle['imputers'][suite]
+
+    state_key = f"single_signal_{bundle['run_id']}_{suite}"
     if generate_clicked or state_key not in st.session_state:
-        I, sig, feature_vector = generate_and_extract(target_c, config, augmentor, bundle['suite'])
+        I, sig, feature_vector = generate_and_extract(target_c, config, augmentor, suite)
         st.session_state[state_key] = dict(E=augmentor.calibration.potential_grid_V, I=I, peak=sig.peak,
                                             target_c=target_c, feature_vector=feature_vector)
     last = st.session_state[state_key]
 
-    X_row = pd.DataFrame([last['feature_vector']], columns=bundle['feature_columns'])
-    predicted_c = float(predict(bundle['models'][model_name], bundle['imputer'], X_row)[0])
+    X_row = pd.DataFrame([last['feature_vector']], columns=feature_columns)
+    predicted_c = float(predict(bundle['models'][model_name], imputer, X_row)[0])
 
-    is_leaky, reason = check_single_signal_leakage(last['feature_vector'], last['target_c'], bundle)
+    is_leaky, reason = check_single_signal_leakage(last['feature_vector'], last['target_c'], bundle, model_name)
     if is_leaky:
         st.warning(f'⚠️ **Possible leakage:** {reason}. Tweak the target concentration or the noise / '
                    'baseline / drift settings further so this test signal is clearly independent from '
@@ -401,8 +463,9 @@ def render_single_signal_test(bundle: dict, model_name: str) -> None:
                        predicted=predicted_c, abs_pct_error=abs_pct_error)
             st.session_state.setdefault('test_history', []).append(row)
 
-    st.caption('Features the model is evaluating for this signal:')
-    st.dataframe(pd.DataFrame([last['feature_vector']], columns=bundle['feature_columns']),
+    st.caption('Raw signal the model is evaluating for this signal:' if suite == 'raw_signal' else
+               'Features the model is evaluating for this signal:')
+    st.dataframe(pd.DataFrame([last['feature_vector']], columns=feature_columns),
                  width='stretch', hide_index=True)
 
     if st.session_state.get('test_history'):

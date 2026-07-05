@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from augmentation_pipeline import AugmentedDataset, FeatureVectorizer, FullRangeDataAugmentor
+from augmentation_pipeline import AugmentedDataset, FEATURE_COLUMNS_BY_SUITE, FeatureVectorizer, FullRangeDataAugmentor
 
 # Section 0 - static configuration
 DATASET_PATH = 'datasets/Standard calibration in culture media_extended.xlsx'
@@ -165,11 +165,25 @@ def combine_sources(keys: Sequence[str], sources: dict) -> tuple[np.ndarray, np.
 def featurize(E: np.ndarray, X: np.ndarray, y: np.ndarray, suite: str = 'core') -> pd.DataFrame:
     """Vectorize a raw (already baseline-subtracted) signal batch into a
     tidy feature DataFrame for the given suite ('core' / 'extended' /
-    'experimental'), plus a 'concentration' column.
+    'experimental' / 'raw_signal'), plus a 'concentration' column.
 
     Works uniformly for real, physics-augmented, GAN and user-generated
     batches since they all share the same on-disk row format.
+
+    'raw_signal' (torch_models.CNN1DRegressor's input) is a pass-through,
+    not an engineered suite: it skips FeatureVectorizer/Signal entirely and
+    returns the I(E) samples as-is. This matters because Signal's
+    constructor Savitzky-Golay-smooths its input for peak detection - fine
+    for the engineered features, but the CNN was trained directly on
+    training/tune_dl_hparams.py's raw/raw_signals_real.csv values, so
+    smoothing here would be a train/inference distribution mismatch.
     """
+    if suite == 'raw_signal':
+        cols = FEATURE_COLUMNS_BY_SUITE['raw_signal']
+        df = pd.DataFrame(np.asarray(X, dtype=float), columns=cols)
+        df['concentration'] = np.asarray(y, dtype=float)
+        return df
+
     E = np.asarray(E, dtype=float)
     dataset = AugmentedDataset(potential_grid_V=E, concentrations_uM=np.asarray(y, dtype=float),
                                 signals_uA=np.asarray(X, dtype=float))
