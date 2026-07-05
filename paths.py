@@ -12,11 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 # Source data (lab measurements)
-DATASETS_DIR = ROOT / 'datasets'
+DATASETS_DIR = ROOT / 'data'/ 'datasets'
 CALIBRATION_WORKBOOK = DATASETS_DIR / 'Standard calibration in culture media_extended.xlsx'
 
 # Raw signal batches
-RAW_DIR = ROOT / 'raw'
+RAW_DIR = ROOT / 'data' / 'raw'
 POTENTIAL_GRID_CSV = RAW_DIR / 'raw_potential_grid.csv'
 REAL_SIGNALS_CSV = RAW_DIR / 'raw_signals_real.csv'
 AUGMENTED_SIGNALS_CSV = RAW_DIR / 'raw_signals_augmented.csv'
@@ -27,7 +27,7 @@ POTENTIAL_GRID_SMALL_INTERVAL_CSV = RAW_DIR / 'raw_potential_grid_small_interval
 AUGMENTED_SIGNALS_SMALL_INTERVAL_CSV = RAW_DIR / 'raw_signals_augmented_small_interval.csv'
 
 # Engineered feature vectors
-VECTORIZED_DIR = ROOT / 'vectorized'
+VECTORIZED_DIR = ROOT / 'data' / 'vectorized'
 VECTORIZED_EXPERIMENTAL_CSV = VECTORIZED_DIR / 'experimental.csv'
 VECTORIZED_CORE_CSV = VECTORIZED_DIR / 'core.csv'
 VECTORIZED_EXTENDED_CSV = VECTORIZED_DIR / 'extended.csv'
