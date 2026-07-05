@@ -1529,7 +1529,9 @@ def quick_compare(
     Returns
     pd.DataFrame with columns: batch, KS_mean, JSD_mean, MMD2, SWD_mean,
                                 PFF_frac, RS_R2, delta_ACF,
-                                VFI, PDF_overlap_mean, final_pass
+                                VFI, PDF_overlap_mean, tier1_pass, tier2_pass,
+                                (TSTR_log_rmse_ratio, tier3_pass if tier 3 run),
+                                (mean_DS, tier4_pass if tier 4 run), final_pass
 
     Example
     >>> df = quick_compare(E, X_real, y_real,
@@ -1541,7 +1543,7 @@ def quick_compare(
     rows = []
     for name, (X_s, y_s) in batches.items():
         r = gate.run(X_s, y_s, verbose=False, run_tiers=run_tiers)
-        rows.append({
+        row = {
             'batch':           name,
             'KS_mean_frac':    round(r.get('ks_mean_frac',  float('nan')), 4),
             'JSD_mean':        round(r.get('mean_jsd',       float('nan')), 4),
@@ -1555,5 +1557,13 @@ def quick_compare(
             'PDF_overlap_mean': round(r.get('pdf_overlap', {}).get('mean', float('nan')), 4),
             'tier1_pass':      r.get('tier1_pass'),
             'tier2_pass':      r.get('tier2_pass'),
-        })
+        }
+        if 3 in run_tiers:
+            row['TSTR_log_rmse_ratio'] = round(r.get('tstr_res', {}).get('log_rmse_ratio', float('nan')), 4)
+            row['tier3_pass'] = r.get('tier3_pass')
+        if 4 in run_tiers:
+            row['mean_DS'] = round(r.get('mean_ds', float('nan')), 4)
+            row['tier4_pass'] = r.get('tier4_pass')
+        row['final_pass'] = r.get('final_pass')
+        rows.append(row)
     return pd.DataFrame(rows)

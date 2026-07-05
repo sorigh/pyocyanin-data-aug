@@ -34,14 +34,10 @@ VECTORIZED_EXTENDED_CSV = VECTORIZED_DIR / 'extended.csv'
 
 # GAN checkpoints/samples/logs
 GAN_OUTPUT_DIR = ROOT / 'gan_output'
-GAN_MODEL_DIRS = {
-    'Trained on Real data': GAN_OUTPUT_DIR / 'models_trained_on_real',
-    'Trained on Combined (real + physics-aug) data': GAN_OUTPUT_DIR / 'models_trained_on_combined',
-}
-GAN_SAMPLE_DIRS = {
-    'Trained on Real data': GAN_OUTPUT_DIR / 'samples_trained_on_real',
-    'Trained on Combined (real + physics-aug) data': GAN_OUTPUT_DIR / 'samples_trained_on_combined',
-}
+TIMEGAN_SIGNALS_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_real' / 'timegan_signals.csv'
+WGANGP_SIGNALS_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_real' / 'wgangp_signals.csv'
+TIMEGAN_SIGNALS_TRAINED_COMBINED_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_combined' / 'timegan_signals.csv'
+WGANGP_SIGNALS_TRAINED_COMBINED_CSV = GAN_OUTPUT_DIR / 'samples_trained_on_combined' / 'wgangp_signals.csv'
 
 # trained regressor bundles (export_models.py output, used in
 # pages/Model_Training_Testing.py)
