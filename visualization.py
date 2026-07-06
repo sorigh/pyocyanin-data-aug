@@ -102,7 +102,7 @@ def plot_signal_overlay(E: np.ndarray, real: tuple, sources: dict, concentration
     colors = _resolve_colors(['Real'] + list(sources.keys()))
 
     fig = go.Figure()
-    real_idx = _select_signals(X_real, y_real, concentration, n_traces=1000, rng=rng)
+    real_idx = _select_signals(X_real, y_real, concentration, n_traces=15, rng=rng)
     for k, i in enumerate(real_idx):
         fig.add_trace(go.Scatter(
             x=E, y=X_real[i], mode='lines', line=dict(color=colors['Real'], width=2.0),
