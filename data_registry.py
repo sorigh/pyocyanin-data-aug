@@ -60,6 +60,8 @@ GAN_MODEL_DIRS = {
 SOURCE_LABELS = {
     'real': 'Real (lab-measured)',
     'stable_augmented': 'Stable augmented (physics-informed, recommended settings)',
+    'stable_wgangp': 'Stable WGAN-GP (GAN, trained on real data)',
+    'stable_timegan': 'Stable TimeGAN (GAN, trained on real data)',
     'custom_generated': 'Custom generated (Data Generation page)',
     'gan_generated': 'GAN synthetic (Data Generation page)',
 }
@@ -84,6 +86,22 @@ def load_real_batch() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 def load_stable_augmented_batch() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     E = pd.read_csv(POTENTIAL_GRID_PATH).values.flatten()
     df = pd.read_csv(STABLE_AUGMENTED_PATH)
+    y = df['concentration'].to_numpy()
+    X = df.drop(columns=['concentration']).to_numpy()
+    return E, X, y
+
+@st.cache_data(show_spinner=False)
+def load_stable_wgangp_batch() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    E = pd.read_csv(POTENTIAL_GRID_PATH).values.flatten()
+    df = pd.read_csv(paths.WGANGP_SIGNALS_CSV)
+    y = df['concentration'].to_numpy()
+    X = df.drop(columns=['concentration']).to_numpy()
+    return E, X, y
+
+@st.cache_data(show_spinner=False)
+def load_stable_timegan_batch() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    E = pd.read_csv(POTENTIAL_GRID_PATH).values.flatten()
+    df = pd.read_csv(paths.TIMEGAN_SIGNALS_CSV)
     y = df['concentration'].to_numpy()
     X = df.drop(columns=['concentration']).to_numpy()
     return E, X, y
@@ -119,7 +137,19 @@ def get_available_sources() -> dict[str, dict]:
         label=SOURCE_LABELS['stable_augmented'], E=E, X=X, y=y, n=len(y),
         meta={'origin': STABLE_AUGMENTED_PATH, 'note': 'Generated once with AugmentationConfig() defaults.'},
         available=True)
+    
+    E, X, y = load_stable_wgangp_batch()
+    sources['stable_wgangp'] = dict(
+        label=SOURCE_LABELS['stable_wgangp'], E=E, X=X, y=y, n=len(y),
+        meta={'origin': paths.WGANGP_SIGNALS_CSV, 'note': 'Pre-generated WGAN-GP sample batch, trained on real data.'},
+        available=True)
 
+    E, X, y = load_stable_timegan_batch()
+    sources['stable_timegan'] = dict(
+        label=SOURCE_LABELS['stable_timegan'], E=E, X=X, y=y, n=len(y),
+        meta={'origin': paths.TIMEGAN_SIGNALS_CSV, 'note': 'Pre-generated TimeGAN sample batch, trained on real data.'},
+        available=True)
+    
     session_datasets = st.session_state.get('datasets', {})
     for key in ('custom_generated', 'gan_generated'):
         entry = session_datasets.get(key)

@@ -471,7 +471,7 @@ def render_gan_generation_tab() -> None:
             preview['E'], 
             (preview['X_real'], preview['y_real']), 
             {preview['architecture']: (preview['X_gen'], preview['y_gen'])},
-            concentration=float(np.median(preview['y_gen']))
+            concentration=round(float(np.median(preview['y_gen'])), 2)
             )
             st.plotly_chart(fig, width='stretch')
         with right:

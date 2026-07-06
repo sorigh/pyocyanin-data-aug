@@ -104,7 +104,7 @@ def init_trained_runs(sources: dict) -> None:
 
 
 # Section 2 - Module A: in-depth model selection & training
-DATASET_SOURCE_KEYS = ['real', 'stable_augmented', 'custom_generated', 'gan_generated']
+DATASET_SOURCE_KEYS = ['real', 'stable_augmented', 'stable_wgangp', 'stable_timegan', 'custom_generated', 'gan_generated']
 
 
 def render_training_module(sources: dict) -> None:
