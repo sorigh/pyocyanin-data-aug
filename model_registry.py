@@ -2,24 +2,21 @@
 real-data-only baseline) and the "Model Training & Testing" page (in-session
 training on whatever data/feature-suite the user picks).
 
-'ridge' / 'random_forest' / 'xgboost' hyperparameters are copied verbatim from
-`ABLATION_MODELS` in `full_range_data_augmentation.ipynb` (Section 10,
-"Ablation Study") - see `export_models.py`'s docstring for why.
+'ridge' / 'random_forest' / 'xgboost' hyperparameters are copied from
+`ABLATION_MODELS` in `full_range_data_augmentation.ipynb`.
 
-'svr' / 'xgboost_tuned' / 'mlp' / 'cnn' hyperparameters are copied verbatim
+'svr' / 'xgboost_tuned' / 'mlp' / 'cnn' hyperparameters are copied
 from `models/regressors/svr_xgb_best_params.json` and
-`models/regressors/mlp_cnn_best_params.json` - the outputs of
-`training/tune_ml_hparams.py` (nested LOOCV + skopt.BayesSearchCV) and
-`training/tune_dl_hparams.py` (Optuna) respectively. They're hardcoded here,
-not read from those JSON files at import time, so that re-running the tuning
-scripts (which would silently overwrite those files) can't change frontend
-behaviour without someone deliberately updating this file and that change
-showing up in a diff. 'xgboost_tuned' is kept as a separate entry from
-'xgboost' rather than replacing it, so the ablation-study baseline stays
+`models/regressors/mlp_cnn_best_params.json`.
+The outputs of `training/tune_ml_hparams.py` (nested LOOCV + skopt.BayesSearchCV) and
+`training/tune_dl_hparams.py` (Optuna) respectively.
+
+'xgboost_tuned' is kept as a separate entry from
+'xgboost' so the ablation-study baseline stays
 available for comparison against the LOOCV-tuned version in the frontend.
 
-Keeping every factory in one place means both training paths (offline
-export, in-app retraining) fit the exact same model architectures.
+Keeping every factory in one place means both training paths fit 
+the same model architectures.
 """
 
 from __future__ import annotations
@@ -29,13 +26,14 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
 from torch.utils.data import DataLoader, TensorDataset
 from xgboost import XGBRegressor
 
@@ -45,15 +43,19 @@ from torch_models import (
 )
 
 MODEL_LABELS = {
-    'ridge': 'Ridge', 'random_forest': 'Random Forest', 'xgboost': 'XGBoost',
+    'ridge': 'Ridge', 'elastic_net': 'Elastic Net', 'decision_tree': 'Decision Tree',
+    'random_forest': 'Random Forest', 'xgboost': 'XGBoost',
     'svr': 'SVR (RBF, tuned)', 'xgboost_tuned': 'XGBoost (LOOCV-tuned)',
     'mlp': 'MLP (tuned)', 'cnn': '1D-CNN (tuned)',
 }
 
-# Models that consume the raw 229-point signal (the 'raw_signal' pseudo-suite
-# in augmentation_pipeline.FEATURE_COLUMNS_BY_SUITE) instead of an engineered
-# feature suite. Everything else in MODEL_LABELS is a tabular model.
+# Models that consume the raw signal
 RAW_SIGNAL_MODELS = {'cnn'}
+
+# From models/lab_experimental_grid_best_params.json ('elastic_net'/'decision_tree'.best_params)
+# the condition-sweep's grid-search winner on the same lab/experimental 
+_ELASTIC_NET_BEST_PARAMS = dict(alpha=0.001, l1_ratio=0.9)
+_DECISION_TREE_BEST_PARAMS = dict(max_depth=5, min_samples_split=2, min_samples_leaf=1, ccp_alpha=0.0)
 
 # From models/regressors/svr_xgb_best_params.json ('svr'.best_params / 'xgboost'.best_params)
 _SVR_BEST_PARAMS = dict(C=868.4208570619496, epsilon=0.0022767724858461062, gamma=0.0001)
@@ -63,10 +65,7 @@ _XGB_TUNED_BEST_PARAMS = dict(
     gamma=7.160304412758296e-05, reg_alpha=8.493583217951526e-06, reg_lambda=0.011728497290648301,
 )
 
-# From models/regressors/mlp_cnn_best_params.json. The MLP was re-tuned after
-# an initial run trained on raw, unstandardized features (peak_FWHM ~0.05 vs
-# wavelet_energy ~1e6) collapsed to predicting a constant regardless of
-# input - see the "must standardize" note on MLPWrapper below.
+# From models/regressors/mlp_cnn_best_params.json. 
 _MLP_BEST_PARAMS = dict(
     lr=0.003336101309469784, n_layers=1, hidden_0=16,
     dropout=0.13611590802176332, batch_size=4, weight_decay=5.924870051994317e-05,
@@ -131,9 +130,7 @@ class TorchRegressorWrapper(BaseEstimator, RegressorMixin):
     def load_pretrained_weights(self, shape_hint: int, state_dict_path: str) -> "TorchRegressorWrapper":
         """Skip fit(): build the tuned architecture and load already-trained
         weights directly. Used by export_models.py for the baseline bundle,
-        which reuses training/tune_dl_hparams.py's output (already trained on
-        all real data with these exact hyperparameters) instead of paying to
-        retrain an identical model from a fresh random init."""
+        which reuses training/tune_dl_hparams.py's output."""
         self.model_ = self._build_model_for_shape(shape_hint)
         self.model_.load_state_dict(torch.load(state_dict_path, map_location='cpu'))
         self.model_.eval()
@@ -148,14 +145,13 @@ class TorchRegressorWrapper(BaseEstimator, RegressorMixin):
 
 class MLPWrapper(TorchRegressorWrapper):
     """The MLP's raw engineered features span >6 orders of magnitude
-    (peak_FWHM ~0.05 vs wavelet_energy ~1e6). Left unstandardized, the first
-    Linear+ReLU layer reliably saturates dead for every input - confirmed on
-    this exact dataset, where a first unscaled training run produced a
-    checkpoint whose output had zero variance across all 40 real signals.
-    So unlike CNNWrapper (raw signal, already a single physical quantity at
-    a consistent scale), this wrapper always standardizes X before it
-    reaches the network - fitting a fresh StandardScaler in fit(), or
-    loading training/tune_dl_hparams.py's saved one in load_pretrained_weights().
+    (peak_FWHM ~0.05 vs wavelet_energy ~1e6). If unstandardized, the first
+    Linear+ReLU layer saturates (first unscaled training run produced a
+    checkpoint without variance across all 40 real signals).
+    So unlike CNNWrapper (raw signal)
+ 
+    Always standardized before it reaches the network (fitting a fresh StandardScaler in fit(), or
+    loading training/tune_dl_hparams.py's saved one in load_pretrained_weights()).
     """
 
     def __init__(self, best_params: dict, best_epoch: int, scaler=None,
@@ -200,6 +196,9 @@ MODEL_FACTORIES = {
     'ridge': lambda: make_pipeline(
         SimpleImputer(strategy='median'),
         Ridge(alpha=0.1, fit_intercept=True, random_state=42)),
+    'elastic_net': lambda: make_pipeline(
+        StandardScaler(), ElasticNet(max_iter=20000, random_state=42, **_ELASTIC_NET_BEST_PARAMS)),
+    'decision_tree': lambda: DecisionTreeRegressor(random_state=42, **_DECISION_TREE_BEST_PARAMS),
     'random_forest': lambda: RandomForestRegressor(
         n_estimators=500, max_depth=9, max_features=0.75,
         min_samples_split=2, min_samples_leaf=1,
@@ -218,21 +217,31 @@ MODEL_FACTORIES = {
 }
 
 
+def build_from_sweep_params(model_key: str, best_params: dict, seed: int = 42) -> BaseEstimator:
+    """Build an unfit sklearn/XGBoost estimator from a condition-sweep `best_params` dict
+
+    Reuses `build_model_specs()` pipeline
+    the built model is identical to the one the sweep actually tuned 
+    Parameter keys map directly to the pipeline steps, requiring no translation.
+    """
+   
+    from training.tune_ml_hparams import build_model_specs  # local import: sklearn/skopt-heavy, only needed here
+    spec = build_model_specs(seed)[model_key]
+    return clone(spec['pipeline']).set_params(**best_params)
+
+
 # Section 3 - shared fit / predict entry points
 def train_models(X: pd.DataFrame, y: pd.Series, model_keys: list[str],
                   X_raw_signal: pd.DataFrame | None = None) -> tuple[dict, SimpleImputer, SimpleImputer | None]:
     """Fit one model per `model_keys` entry plus a median imputer per input
     representation in use.
 
-    `X` holds whichever engineered feature suite (core/extended/experimental)
-    the caller picked; `X_raw_signal` (only needed if a model in
-    RAW_SIGNAL_MODELS - currently just 'cnn' - is requested) holds the raw
-    229-point signal instead. Each raw-signal model is fit against
-    `X_raw_signal`; everything else is fit against `X`.
+    `X` holds the picked feature suite (core/extended/experimental)
+    `X_raw_signal` (if a raw signal model is requested)
 
     The imputers mirror `export_models.py`'s safety net: real training data
     has no NaNs, but a manually-augmented or GAN-generated single signal can
-    occasionally hit a degenerate edge case in one experimental feature.
+    occasionally hit an edge case in one experimental feature.
     """
     imputer = SimpleImputer(strategy='median').fit(X)
     raw_signal_imputer = SimpleImputer(strategy='median').fit(X_raw_signal) if X_raw_signal is not None else None
