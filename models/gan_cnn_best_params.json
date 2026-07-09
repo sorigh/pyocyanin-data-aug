@@ -1,0 +1,25 @@
+{
+  "cnn": {
+    "best_params": {
+      "lr": 0.0015696396388661157,
+      "n_conv_layers": 4,
+      "base_filters": 16,
+      "kernel_size": 9,
+      "dropout": 0.2427013306774357,
+      "fc_hidden": 32,
+      "batch_size": 16,
+      "weight_decay": 3.945908811099999e-06
+    },
+    "best_epoch": 97,
+    "val_mae_uM": 0.9345239996910095,
+    "n_trials": 30,
+    "n_pruned": 8,
+    "n_train": 480,
+    "n_val": 120,
+    "signals_csv": "raw/gan_only_raw_signals.csv",
+    "signal_len": 229,
+    "nested_cv_mae": 3.194958305855592,
+    "nested_cv_rmse": 7.350440317801508,
+    "nested_cv_r2": 0.8882727711472201
+  }
+}

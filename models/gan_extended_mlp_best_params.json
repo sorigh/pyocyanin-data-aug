@@ -1,0 +1,33 @@
+{
+  "mlp": {
+    "best_params": {
+      "lr": 0.0003687240409997104,
+      "n_layers": 3,
+      "hidden_0": 64,
+      "hidden_1": 128,
+      "hidden_2": 128,
+      "dropout": 0.10270766584245733,
+      "batch_size": 8,
+      "weight_decay": 0.0004315823675493483
+    },
+    "best_epoch": 37,
+    "val_mae_uM": 1.090025544166565,
+    "n_trials": 30,
+    "n_pruned": 4,
+    "n_train": 480,
+    "n_val": 120,
+    "features_csv": "vectorized/gan_only_extended.csv",
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "nested_cv_mae": 4.340118590450535,
+    "nested_cv_rmse": 10.536895171203998,
+    "nested_cv_r2": 0.7704075329924549
+  }
+}

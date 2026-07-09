@@ -1,0 +1,42 @@
+{
+  "real_csv": "raw/raw_signals_real.csv",
+  "combined_csv": "raw/raw_signals_combined.csv",
+  "potential_csv": "raw/raw_potential_grid.csv",
+  "train_on": "combined",
+  "signal_len": 229,
+  "latent_dim": 128,
+  "cond_dim": 16,
+  "gen_channels": [
+    256,
+    128,
+    64,
+    32
+  ],
+  "crit_channels": [
+    32,
+    64,
+    128,
+    256
+  ],
+  "kernel_size": 9,
+  "epochs": 8000,
+  "batch_size": 32,
+  "lr_gen": 0.0001,
+  "lr_crit": 0.0001,
+  "betas": [
+    0.0,
+    0.9
+  ],
+  "n_critic": 5,
+  "lambda_gp": 10.0,
+  "clip_output": true,
+  "dropout": 0.1,
+  "spectral_norm": true,
+  "log_every": 200,
+  "save_every": 2000,
+  "seed": 42,
+  "n_generate": 300,
+  "gen_conc_mode": "log_uniform",
+  "conc_min": 0.1,
+  "conc_max": 100.0
+}

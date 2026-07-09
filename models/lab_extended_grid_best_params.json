@@ -1,0 +1,99 @@
+{
+  "ridge": {
+    "search_method": "grid",
+    "best_params": {
+      "ridge__alpha": 0.001,
+      "ridge__fit_intercept": true
+    },
+    "final_search_cv_mae": 1.2498426585661206,
+    "nested_cv_mae": 0.37713115117925333,
+    "nested_cv_rmse": 0.6341400118530697,
+    "nested_cv_r2": 0.9994648318062616,
+    "n_samples": 40,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/extended.csv"
+  },
+  "elastic_net": {
+    "search_method": "grid",
+    "best_params": {
+      "elasticnet__alpha": 0.001,
+      "elasticnet__l1_ratio": 0.9
+    },
+    "final_search_cv_mae": 1.8898767703193355,
+    "nested_cv_mae": 0.6015362155771987,
+    "nested_cv_rmse": 0.9645338316572064,
+    "nested_cv_r2": 0.9987619023124784,
+    "n_samples": 40,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/extended.csv"
+  },
+  "decision_tree": {
+    "search_method": "grid",
+    "best_params": {
+      "decisiontreeregressor__ccp_alpha": 0.0,
+      "decisiontreeregressor__max_depth": 8,
+      "decisiontreeregressor__min_samples_leaf": 1,
+      "decisiontreeregressor__min_samples_split": 2
+    },
+    "final_search_cv_mae": 4.101282051282051,
+    "nested_cv_mae": 0.013214285714285715,
+    "nested_cv_rmse": 0.04828698223187306,
+    "nested_cv_r2": 0.9999968970118981,
+    "n_samples": 40,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/extended.csv"
+  },
+  "random_forest": {
+    "search_method": "grid",
+    "best_params": {
+      "randomforestregressor__max_depth": 10,
+      "randomforestregressor__max_features": "sqrt",
+      "randomforestregressor__min_samples_leaf": 1,
+      "randomforestregressor__min_samples_split": 2,
+      "randomforestregressor__n_estimators": 300
+    },
+    "final_search_cv_mae": 4.606174908424909,
+    "nested_cv_mae": 1.061374851190476,
+    "nested_cv_rmse": 2.565519021081573,
+    "nested_cv_r2": 0.9912406786497416,
+    "n_samples": 40,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/extended.csv"
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "ridge": {
+    "search_method": "grid",
+    "best_params": {
+      "ridge__alpha": 0.001,
+      "ridge__fit_intercept": true
+    },
+    "final_search_cv_mae": 1.0949740705201727,
+    "nested_cv_mae": 1.095228068637326,
+    "nested_cv_rmse": 2.810644133996417,
+    "nested_cv_r2": 0.98366406320153,
+    "n_samples": 600,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/gan_only_extended.csv"
+  },
+  "elastic_net": {
+    "search_method": "grid",
+    "best_params": {
+      "elasticnet__alpha": 0.001,
+      "elasticnet__l1_ratio": 0.9
+    },
+    "final_search_cv_mae": 1.1164548482703842,
+    "nested_cv_mae": 1.114030259184064,
+    "nested_cv_rmse": 2.816202043665869,
+    "nested_cv_r2": 0.9835993923099161,
+    "n_samples": 600,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/gan_only_extended.csv"
+  },
+  "decision_tree": {
+    "search_method": "grid",
+    "best_params": {
+      "decisiontreeregressor__ccp_alpha": 0.0,
+      "decisiontreeregressor__max_depth": 12,
+      "decisiontreeregressor__min_samples_leaf": 1,
+      "decisiontreeregressor__min_samples_split": 5
+    },
+    "final_search_cv_mae": 1.0802971318070884,
+    "nested_cv_mae": 1.1263916463210797,
+    "nested_cv_rmse": 3.3255904380786876,
+    "nested_cv_r2": 0.9771298060746828,
+    "n_samples": 600,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/gan_only_extended.csv"
+  },
+  "random_forest": {
+    "search_method": "grid",
+    "best_params": {
+      "randomforestregressor__max_depth": 10,
+      "randomforestregressor__max_features": "sqrt",
+      "randomforestregressor__min_samples_leaf": 2,
+      "randomforestregressor__min_samples_split": 2,
+      "randomforestregressor__n_estimators": 100
+    },
+    "final_search_cv_mae": 0.8587494856845032,
+    "nested_cv_mae": 0.8230122098197303,
+    "nested_cv_rmse": 2.4796024464040842,
+    "nested_cv_r2": 0.9872855835022177,
+    "n_samples": 600,
+    "n_features": 7,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "features_csv": "vectorized/gan_only_extended.csv"
+  }
+}

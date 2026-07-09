@@ -1,0 +1,87 @@
+{
+  "ridge": {
+    "search_method": "grid",
+    "best_params": {
+      "ridge__alpha": 1.0,
+      "ridge__fit_intercept": true
+    },
+    "final_search_cv_mae": 1.1181738272807529,
+    "nested_cv_mae": 1.1222157538240127,
+    "nested_cv_rmse": 2.5418914947552134,
+    "nested_cv_r2": 0.9864186812121807,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  },
+  "elastic_net": {
+    "search_method": "grid",
+    "best_params": {
+      "elasticnet__alpha": 0.01,
+      "elasticnet__l1_ratio": 0.7
+    },
+    "final_search_cv_mae": 1.1183842125010963,
+    "nested_cv_mae": 1.1218487605809873,
+    "nested_cv_rmse": 2.5536043333389253,
+    "nested_cv_r2": 0.9862932295164666,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  },
+  "decision_tree": {
+    "search_method": "grid",
+    "best_params": {
+      "decisiontreeregressor__ccp_alpha": 0.0,
+      "decisiontreeregressor__max_depth": null,
+      "decisiontreeregressor__min_samples_leaf": 4,
+      "decisiontreeregressor__min_samples_split": 2
+    },
+    "final_search_cv_mae": 0.9294067120657524,
+    "nested_cv_mae": 0.9294686415740707,
+    "nested_cv_rmse": 2.7114630435340823,
+    "nested_cv_r2": 0.9845461993239044,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  },
+  "random_forest": {
+    "search_method": "grid",
+    "best_params": {
+      "randomforestregressor__max_depth": null,
+      "randomforestregressor__max_features": "sqrt",
+      "randomforestregressor__min_samples_leaf": 1,
+      "randomforestregressor__min_samples_split": 2,
+      "randomforestregressor__n_estimators": 100
+    },
+    "final_search_cv_mae": 0.7974962024232903,
+    "nested_cv_mae": 0.7755937649959113,
+    "nested_cv_rmse": 2.2735432100413377,
+    "nested_cv_r2": 0.9891348843675704,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  }
+}

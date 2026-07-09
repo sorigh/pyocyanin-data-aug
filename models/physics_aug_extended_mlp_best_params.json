@@ -1,0 +1,32 @@
+{
+  "mlp": {
+    "best_params": {
+      "lr": 0.005125888954446644,
+      "n_layers": 2,
+      "hidden_0": 256,
+      "hidden_1": 128,
+      "dropout": 0.15276355592719332,
+      "batch_size": 4,
+      "weight_decay": 1.0524746466754556e-05
+    },
+    "best_epoch": 66,
+    "val_mae_uM": 0.6384456157684326,
+    "n_trials": 30,
+    "n_pruned": 4,
+    "n_train": 240,
+    "n_val": 60,
+    "features_csv": "vectorized/full_augmented_extended.csv",
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min"
+    ],
+    "nested_cv_mae": 1.7997354507942995,
+    "nested_cv_rmse": 4.846255111295052,
+    "nested_cv_r2": 0.9428487914085308
+  }
+}

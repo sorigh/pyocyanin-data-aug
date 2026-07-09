@@ -1,0 +1,49 @@
+{
+  "mlp": {
+    "best_params": {
+      "lr": 0.005550848532063986,
+      "n_layers": 3,
+      "hidden_0": 128,
+      "hidden_1": 32,
+      "hidden_2": 64,
+      "dropout": 0.19675946615421505,
+      "batch_size": 8,
+      "weight_decay": 0.00023001037062661404
+    },
+    "best_epoch": 13,
+    "val_mae_uM": 0.619474470615387,
+    "n_trials": 30,
+    "n_pruned": 8,
+    "n_train": 240,
+    "n_val": 60,
+    "features_csv": "vectorized/full_augmented_experimental.csv",
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min",
+      "left_slope",
+      "right_slope",
+      "asymetry",
+      "peak_sharpness",
+      "peak_compactness",
+      "current_variance",
+      "peak_skewness",
+      "peak_kurtosis",
+      "tchebichef_curve_moments",
+      "mean_peak",
+      "signal_entropy",
+      "spectral_entropy",
+      "fft_power",
+      "pca2_comp",
+      "pca3_comp",
+      "wavelet_energy"
+    ],
+    "nested_cv_mae": 1.5554135306179524,
+    "nested_cv_rmse": 4.181082216629264,
+    "nested_cv_r2": 0.9574607048130679
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "svr": {
+    "search_method": "bayes",
+    "best_params": {
+      "svr__C": 115.33999859559563,
+      "svr__epsilon": 0.0036927778279520333,
+      "svr__gamma": 0.09777670269847542
+    },
+    "final_search_cv_mae": 0.8989363390985652,
+    "nested_cv_mae": 0.8978488569775254,
+    "nested_cv_rmse": 2.5228180463672576,
+    "nested_cv_r2": 0.9866217352778911,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  },
+  "xgboost": {
+    "search_method": "bayes",
+    "best_params": {
+      "xgbregressor__colsample_bytree": 0.9249583953429453,
+      "xgbregressor__gamma": 3.1268392668305813e-07,
+      "xgbregressor__learning_rate": 0.07645185888630145,
+      "xgbregressor__max_depth": 7,
+      "xgbregressor__min_child_weight": 6,
+      "xgbregressor__n_estimators": 93,
+      "xgbregressor__reg_alpha": 0.06341686887862838,
+      "xgbregressor__reg_lambda": 3.094007864244482,
+      "xgbregressor__subsample": 0.9647715446027535
+    },
+    "final_search_cv_mae": 0.8298690504514775,
+    "nested_cv_mae": 0.8129631862979392,
+    "nested_cv_rmse": 2.329199359664533,
+    "nested_cv_r2": 0.9885964190064358,
+    "n_samples": 940,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/combined_all_core.csv"
+  }
+}
