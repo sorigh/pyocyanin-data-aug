@@ -1,40 +1,33 @@
 """
-Nested LOOCV + Bayesian Hyperparameter Search for SVR and XGBoost
-==================================================================
+Nested LOOCV/K-Fold + Grid/Bayesian Hyperparameter Search for 6 ML Models
 
 Why this script
 ----------------
-model_training.ipynb already runs a nested LeaveOneOut(outer) / KFold(inner)
-BayesSearchCV loop for RandomForestRegressor and XGBRegressor on the 'core'
-feature suite (4 features, 40 real signals). This script reuses that exact
-methodology - LOOCV outer loop, skopt.BayesSearchCV inner loop, MAE-scored -
-for the two 1D-feature models still missing a proper search: SVR(kernel=
-'rbf') and XGBRegressor, on a configurable feature suite (defaults to the
-'experimental' 23-feature suite, i.e. the one export_models.py actually ships
-as the production baseline).
+model_training.ipynb runs a nested LeaveOneOut(outer) / KFold(inner)
+search loop for six regressors on the 'core' feature suite (4 features, 40
+real signals) 
+Same methodology here (LOOCV or K-fold outer loop, inner
+search MAE-scored)
+Script for DGX.
 
-What the nested loop is/isn't for
-----------------------------------
-The outer LOOCV loop gives an (almost) unbiased estimate of generalisation
-error, since every fold's inner search never sees its own held-out point.
-But - same caveat export_models.py's docstring makes about this notebook -
-it is not meant to hand you one final hyperparameter set: with only 40 rows,
-different outer folds can and do land on different "winners". So after the
-nested loop finishes (and its MAE/RMSE/R2 are saved as the honest
-generalisation-error estimate), this script runs one more BayesSearchCV pass
-on the *full* dataset and treats *that* result as the winning config saved to
-best_params.json.
+REGRESSORS (ridge, elastic_net, decision_tree,
+random_forest, svr, xgboost) + GridSearchCV grid and a
+BayesSearchCV search space (--search-method).
+Default experimental.
 
-SVR gets a StandardScaler in front of it (the notebook's original SVR grid
-didn't scale features) because RBF-kernel SVR is scale-sensitive and the raw
-feature magnitudes here span several orders of magnitude (peak_current ~tens
-of uA, peak_FWHM ~0.08 V) - searching hyperparameters against unscaled
-features would waste the whole point of running this on a DGX box.
+
+best_params.json decided by the last search pass, not by the outer folds.
+
+SVR/Ridge/ElasticNet get a StandardScaler in front of them because they're
+scale-sensitive and the raw feature magnitudes here span several orders of
+magnitude (peak_current ~tens of uA, peak_FWHM ~0.08 V) 
+ Tree-based models (decision_tree, random_forest, gboost) don't need it.
 
 Usage
 -----
     python training/tune_ml_hparams.py
     python training/tune_ml_hparams.py --models svr --n-iter 50
+    python training/tune_ml_hparams.py --models ridge elastic_net decision_tree --search-method grid
     python training/tune_ml_hparams.py --features-csv vectorized/combined_experimental.csv \\
         --outer-cv kfold --outer-splits 5
 
@@ -51,14 +44,17 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold, LeaveOneOut
+from sklearn.model_selection import GridSearchCV, KFold, LeaveOneOut
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
 from skopt import BayesSearchCV
-from skopt.space import Integer, Real
+from skopt.space import Categorical, Integer, Real
 from xgboost import XGBRegressor
 
 
@@ -71,6 +67,7 @@ HP = {
     "outer_cv":      "loo",               # "loo" | "kfold"
     "outer_splits":  5,                   # only used when outer_cv == "kfold"
     "inner_splits":  3,
+    "search_method": "bayes",             # "bayes" | "grid"
     "n_iter":        32,                  # BayesSearchCV iterations per fold
     "n_jobs":        -1,
     "seed":          42,
@@ -82,15 +79,73 @@ HP = {
 }
 
 
-# 1. MODEL SPECS (pipeline + search space per model)
+# 1. MODEL SPECS (pipeline + a Bayes search space + a Grid search grid, per model)
 def build_model_specs(seed: int) -> dict:
     return {
+        "ridge": {
+            "pipeline": make_pipeline(StandardScaler(), Ridge()),
+            "bayes_spaces": {
+                "ridge__alpha": Real(1e-3, 1e3, prior="log-uniform"),
+            },
+            "grid_spaces": {
+                "ridge__alpha": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0],
+                "ridge__fit_intercept": [True, False],
+            },
+        },
+        "elastic_net": {
+            "pipeline": make_pipeline(StandardScaler(), ElasticNet(max_iter=20000, random_state=seed)),
+            "bayes_spaces": {
+                "elasticnet__alpha":    Real(1e-3, 1e2, prior="log-uniform"),
+                "elasticnet__l1_ratio": Real(0.0, 1.0),
+            },
+            "grid_spaces": {
+                "elasticnet__alpha":    [0.001, 0.01, 0.1, 1.0, 10.0],
+                "elasticnet__l1_ratio": [0.1, 0.3, 0.5, 0.7, 0.9],
+            },
+        },
+        "decision_tree": {
+            "pipeline": make_pipeline(DecisionTreeRegressor(random_state=seed)),
+            "bayes_spaces": {
+                "decisiontreeregressor__max_depth":        Integer(2, 20),
+                "decisiontreeregressor__min_samples_split": Integer(2, 20),
+                "decisiontreeregressor__min_samples_leaf":  Integer(1, 10),
+                "decisiontreeregressor__ccp_alpha":         Real(1e-5, 1e-1, prior="log-uniform"),
+            },
+            "grid_spaces": {
+                "decisiontreeregressor__max_depth":        [3, 5, 8, 12, None],
+                "decisiontreeregressor__min_samples_split": [2, 5, 10],
+                "decisiontreeregressor__min_samples_leaf":  [1, 2, 4],
+                "decisiontreeregressor__ccp_alpha":         [0.0, 0.001, 0.01],
+            },
+        },
+        "random_forest": {
+            "pipeline": make_pipeline(RandomForestRegressor(random_state=seed, n_jobs=1)),
+            "bayes_spaces": {
+                "randomforestregressor__n_estimators":     Integer(50, 500),
+                "randomforestregressor__max_depth":        Integer(2, 20),
+                "randomforestregressor__min_samples_split": Integer(2, 20),
+                "randomforestregressor__min_samples_leaf":  Integer(1, 10),
+                "randomforestregressor__max_features":      Categorical(["sqrt", "log2", 1.0]),
+            },
+            "grid_spaces": {
+                "randomforestregressor__n_estimators":     [100, 200, 300],
+                "randomforestregressor__max_depth":        [5, 10, None],
+                "randomforestregressor__min_samples_split": [2, 5],
+                "randomforestregressor__min_samples_leaf":  [1, 2],
+                "randomforestregressor__max_features":      ["sqrt", "log2"],
+            },
+        },
         "svr": {
             "pipeline": make_pipeline(StandardScaler(), SVR(kernel="rbf")),
-            "search_spaces": {
+            "bayes_spaces": {
                 "svr__C":       Real(1e-2, 1e3,  prior="log-uniform"),
                 "svr__epsilon": Real(1e-3, 2.0,  prior="log-uniform"),
                 "svr__gamma":   Real(1e-4, 10.0, prior="log-uniform"),
+            },
+            "grid_spaces": {
+                "svr__C":       [0.1, 1, 10, 100, 1000],
+                "svr__epsilon": [0.001, 0.01, 0.1, 0.5, 1.0],
+                "svr__gamma":   [0.0001, 0.001, 0.01, 0.1, 1.0],
             },
         },
         "xgboost": {
@@ -99,7 +154,7 @@ def build_model_specs(seed: int) -> dict:
                 XGBRegressor(objective="reg:squarederror", random_state=seed,
                              n_jobs=1, verbosity=0),
             ),
-            "search_spaces": {
+            "bayes_spaces": {
                 "xgbregressor__n_estimators":     Integer(50, 500),
                 "xgbregressor__max_depth":        Integer(2, 8),
                 "xgbregressor__learning_rate":    Real(1e-2, 0.3,  prior="log-uniform"),
@@ -110,8 +165,39 @@ def build_model_specs(seed: int) -> dict:
                 "xgbregressor__reg_alpha":        Real(1e-8, 10.0, prior="log-uniform"),
                 "xgbregressor__reg_lambda":       Real(1e-3, 10.0, prior="log-uniform"),
             },
+            "grid_spaces": {
+                "xgbregressor__n_estimators":     [100, 200, 300],
+                "xgbregressor__max_depth":        [3, 5, 8],
+                "xgbregressor__learning_rate":    [0.01, 0.05, 0.1, 0.3],
+                "xgbregressor__subsample":        [0.7, 1.0],
+                "xgbregressor__colsample_bytree": [0.7, 1.0],
+            },
         },
     }
+
+
+# 1b. SEARCH FACTORY (Bayes vs Grid, same call signature either way)
+def make_search(spec: dict, hp: dict, cv) -> "BayesSearchCV | GridSearchCV":
+    estimator = clone(spec["pipeline"])
+    if hp["search_method"] == "grid":
+        return GridSearchCV(
+            estimator=estimator,
+            param_grid=spec["grid_spaces"],
+            cv=cv,
+            scoring=hp["scoring"],
+            n_jobs=hp["n_jobs"],
+            refit=True,
+        )
+    return BayesSearchCV(
+        estimator=estimator,
+        search_spaces=spec["bayes_spaces"],
+        n_iter=hp["n_iter"],
+        cv=cv,
+        scoring=hp["scoring"],
+        n_jobs=hp["n_jobs"],
+        random_state=hp["seed"],
+        refit=True,
+    )
 
 
 # 2. DATA
@@ -136,22 +222,13 @@ def run_nested_cv(name: str, spec: dict, X: pd.DataFrame, y: pd.Series, hp: dict
     t0 = time.time()
 
     print(f"\n  [{name}] Nested CV  (outer={hp['outer_cv']}, {n_folds} folds, inner={hp['inner_splits']}-fold, "
-          f"n_iter={hp['n_iter']}) over {len(X)} rows ...")
+          f"search={hp['search_method']}, n_iter={hp['n_iter']}) over {len(X)} rows ...")
 
     for i, (train_idx, test_idx) in enumerate(outer_cv.split(X), start=1):
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
         y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-        opt = BayesSearchCV(
-            estimator=clone(spec["pipeline"]),
-            search_spaces=spec["search_spaces"],
-            n_iter=hp["n_iter"],
-            cv=inner_cv,
-            scoring=hp["scoring"],
-            n_jobs=hp["n_jobs"],
-            random_state=hp["seed"],
-            refit=True,
-        )
+        opt = make_search(spec, hp, inner_cv)
         opt.fit(X_train, y_train)
         pred = opt.best_estimator_.predict(X_test)
 
@@ -190,45 +267,42 @@ def run_nested_cv(name: str, spec: dict, X: pd.DataFrame, y: pd.Series, hp: dict
 # 4. FINAL SEARCH ON THE FULL DATASET (the actual "winning" config)
 def final_search(name: str, spec: dict, X: pd.DataFrame, y: pd.Series, hp: dict) -> tuple[dict, float]:
     inner_cv = KFold(n_splits=hp["inner_splits"], shuffle=True, random_state=hp["seed"])
-    opt = BayesSearchCV(
-        estimator=clone(spec["pipeline"]),
-        search_spaces=spec["search_spaces"],
-        n_iter=hp["n_iter"],
-        cv=inner_cv,
-        scoring=hp["scoring"],
-        n_jobs=hp["n_jobs"],
-        random_state=hp["seed"],
-        refit=True,
-    )
+    opt = make_search(spec, hp, inner_cv)
     opt.fit(X, y)
     print(f"  [{name}] Full-data search best CV MAE: {-opt.best_score_:.4f}")
     return dict(opt.best_params_), float(opt.best_score_)
 
 
+MODEL_CHOICES = ["ridge", "elastic_net", "decision_tree", "random_forest", "svr", "xgboost"]
+
+
 # 5. ENTRY POINT
 def main():
-    parser = argparse.ArgumentParser(description="Nested LOOCV + BayesSearchCV for SVR / XGBoost")
+    parser = argparse.ArgumentParser(description="Nested LOOCV/K-Fold + Grid/BayesSearchCV for 6 ML models")
     parser.add_argument("--features-csv", type=str, default=HP["features_csv"])
     parser.add_argument("--models", type=str, nargs="+", default=HP["models"],
-                        choices=["svr", "xgboost"])
+                        choices=MODEL_CHOICES)
     parser.add_argument("--outer-cv", type=str, default=HP["outer_cv"], choices=["loo", "kfold"])
     parser.add_argument("--outer-splits", type=int, default=HP["outer_splits"])
     parser.add_argument("--inner-splits", type=int, default=HP["inner_splits"])
+    parser.add_argument("--search-method", type=str, default=HP["search_method"], choices=["bayes", "grid"])
     parser.add_argument("--n-iter", type=int, default=HP["n_iter"])
     parser.add_argument("--n-jobs", type=int, default=HP["n_jobs"])
     parser.add_argument("--seed", type=int, default=HP["seed"])
     parser.add_argument("--output", type=str, default=HP["output_json"])
+    parser.add_argument("--log-csv", type=str, default=HP["log_csv"])
     args = parser.parse_args()
 
     hp = dict(HP)
     hp.update(
         features_csv=args.features_csv, models=args.models, outer_cv=args.outer_cv,
-        outer_splits=args.outer_splits, inner_splits=args.inner_splits, n_iter=args.n_iter,
-        n_jobs=args.n_jobs, seed=args.seed, output_json=args.output,
+        outer_splits=args.outer_splits, inner_splits=args.inner_splits,
+        search_method=args.search_method, n_iter=args.n_iter,
+        n_jobs=args.n_jobs, seed=args.seed, output_json=args.output, log_csv=args.log_csv,
     )
 
     print("=" * 60)
-    print("  SVR / XGBoost - Nested LOOCV + Bayesian Hyperparameter Search")
+    print("  ML Regressors - Nested LOOCV/K-Fold + Grid/Bayesian Hyperparameter Search")
     print("=" * 60)
 
     X, y = load_data(hp)
@@ -243,6 +317,7 @@ def main():
         best_params, best_cv_score = final_search(name, spec, X, y, hp)
 
         results[name] = {
+            "search_method":          hp["search_method"],
             "best_params":            best_params,
             "final_search_cv_mae":    -best_cv_score,
             "nested_cv_mae":          nested_metrics["mae"],
