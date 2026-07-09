@@ -2,21 +2,19 @@
 against the pre-trained TimeGAN / WGAN-GP synthetic batches, and generate
 fresh GAN data on demand.
 
-State management, in one sentence: every widget here only ever writes into
+State management: every widget here only ever writes into
 `st.session_state`; the heavy work (generation + the validation gate) runs
 once inside a button handler and its results are cached in
 `st.session_state['dashboard']`, so tweaking a display-only widget (which
 concentration to inspect, which sources to plot) just re-renders Plotly
 figures from already-computed arrays instead of re-running anything.
 
-Datasets a user chooses to keep - the physics-augmented batch or a freshly
-drawn GAN batch - are pushed into `st.session_state['datasets']` via
-`data_registry.save_dataset_to_session()`, which is exactly what the "Model
-Training & Testing" page reads from its own dataset catalog.
+Datasets a user chooses to keep are kept in `st.session_state['datasets']` 
+using `data_registry.save_dataset_to_session()`.
+"Model Training & Testing" page reads from there for the dataset catalog.
 
 All data engineering and plotting logic lives in `augmentation_pipeline.py`,
-`gan_inference.py` and `visualization.py` - this file only wires widgets to
-their functions.
+`gan_inference.py` and `visualization.py`
 """
 
 from __future__ import annotations
@@ -50,7 +48,7 @@ def _vfi_label(vfi: float) -> str:
 # Section 1 - physics-informed control panel (rendered in-page, not the sidebar)
 def recommended_slider(label: str, key: str, recommended: float, span: float,
                         step: float, fmt: str = '%.4f', help: str | None = None) -> float:
-    """A slider whose track is centred on `recommended` (recommended +/- span).
+    """A slider with a centered track on `recommended` (recommended +/- span).
 
     `value=recommended` only seeds `st.session_state[key]` the first time the
     widget is created; on every later rerun (including after the Reset
@@ -84,8 +82,8 @@ def render_control_panel() -> tuple[AugmentationConfig, str, bool]:
                  'just comparing, use the "GAN Data Generation" tab.')
     with top_right:
         st.write('')
-        if st.button('↺ Reset all to recommended', width='stretch'):
-            # Delete (rather than overwrite) so the widgets below fall back to
+        if st.button('Reset all to recommended', width='stretch'):
+            # Delete so the widgets below fall back to
             # their own `value=recommended` default on the next run - setting
             # `st.session_state[key]` directly would collide with that `value=`
             # argument and trigger Streamlit's "widget created with a default
@@ -204,7 +202,7 @@ def render_control_panel() -> tuple[AugmentationConfig, str, bool]:
         rng_seed=int(rng_seed),
     )
 
-    generate_clicked = st.button('⚡ Generate data', type='primary', width='stretch')
+    generate_clicked = st.button('Generate data', type='primary', width='stretch')
     return config, gan_source_label, generate_clicked
 
 
@@ -369,7 +367,7 @@ def render_save_to_session(d: dict) -> None:
     st.caption(f'Saves the **Physics-Augmented** batch above (n={n}, seed={d["config_used"].rng_seed}) into this '
                'session so it shows up as "Custom generated" in the training-data picker on the other page. '
                'Generating a new batch here and saving again overwrites the previous save.')
-    if st.button('💾 Save this dataset for Model Training', type='primary'):
+    if st.button('Save this dataset for Model Training', type='primary'):
         X, y = d['sources']['Physics-Augmented']
         dr.save_dataset_to_session(
             'custom_generated', d['E'], X, y,
@@ -394,8 +392,8 @@ def render_dashboard(d: dict) -> None:
         return
 
     tab_overlay, tab_features, tab_pdf, tab_vfi, tab_raw = st.tabs(
-        ['📈 Signal overlays', '🧬 Feature space', '🎯 PDF Overlap Index',
-         '🏆 Voltammogram Fidelity Index', '📊 Raw gate metrics'])
+        ['Signal overlays', 'Feature space', 'PDF Overlap Index',
+         'Voltammogram Fidelity Index', 'Raw gate metrics'])
     with tab_overlay:
         render_overlay_tab(d, active_sources)
     with tab_features:
@@ -436,7 +434,7 @@ def render_gan_generation_tab() -> None:
                  'the model learned.')
         seed = st.number_input('Random seed', min_value=0, max_value=10_000, value=42, step=1, key='gan_gen_seed')
 
-    generate_clicked = st.button('⚡ Generate GAN dataset', type='primary', width='stretch')
+    generate_clicked = st.button('Generate GAN dataset', type='primary', width='stretch')
 
     if generate_clicked:
         model_dir = dr.GAN_MODEL_DIRS[checkpoint_label]
@@ -471,7 +469,7 @@ def render_gan_generation_tab() -> None:
             preview['E'], 
             (preview['X_real'], preview['y_real']), 
             {preview['architecture']: (preview['X_gen'], preview['y_gen'])},
-            concentration=round(float(np.median(preview['y_gen'])), 2)
+            concentration=None # stop filtering the signals, show all
             )
             st.plotly_chart(fig, width='stretch')
         with right:
@@ -480,7 +478,7 @@ def render_gan_generation_tab() -> None:
         st.caption('Saves this GAN batch into the session so it shows up as "GAN synthetic" in the '
                    'training-data picker on the Model Training & Testing page. Generating again and '
                    're-saving overwrites the previous save.')
-        if st.button('💾 Save this GAN dataset for Model Training', type='primary', key='save_gan_dataset'):
+        if st.button('Save this GAN dataset for Model Training', type='primary', key='save_gan_dataset'):
             dr.save_dataset_to_session(
                 'gan_generated', preview['E'], preview['X_gen'], preview['y_gen'],
                 meta={'origin': f'Data Generation page (GAN: {preview["architecture"]})',
@@ -492,12 +490,12 @@ def render_gan_generation_tab() -> None:
 
 # Section 5 - page entry point
 def main() -> None:
-    st.title('🧬 Data Generation')
+    st.title('Data Generation')
     st.caption('Tune the physics-informed augmentation pipeline and compare it against the '
                'pre-trained TimeGAN / WGAN-GP batches, or draw a fresh GAN batch on demand. '
                'Save either result to use it on the Model Training & Testing page.')
 
-    tab_physics, tab_gan = st.tabs(['⚙️ Physics-Informed Generation', '🤖 GAN Data Generation'])
+    tab_physics, tab_gan = st.tabs(['Physics-Informed Generation', 'GAN Data Generation'])
 
     with tab_physics:
         config, gan_source_label, generate_clicked = render_control_panel()

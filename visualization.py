@@ -102,21 +102,40 @@ def plot_signal_overlay(E: np.ndarray, real: tuple, sources: dict, concentration
     colors = _resolve_colors(['Real'] + list(sources.keys()))
 
     fig = go.Figure()
-    real_idx = _select_signals(X_real, y_real, concentration, n_traces=15, rng=rng)
+
+# Plot Real Signals 
+    if concentration is not None:
+        real_idx = _select_signals(X_real, y_real, concentration, n_traces=15, rng=rng)
+    else:
+        # Pick random signals across all concentrations
+        max_real = len(X_real)
+        n_real = max_real if n_traces is None else min(15, max_real)
+        real_idx = rng.choice(max_real, n_real, replace=False)
+
     for k, i in enumerate(real_idx):
         fig.add_trace(go.Scatter(
             x=E, y=X_real[i], mode='lines', line=dict(color=colors['Real'], width=2.0),
             opacity=0.9, name='Real', legendgroup='Real', showlegend=(k == 0)))
 
+    # Plot Generated Signals
     for name, (X, y) in sources.items():
         X, y = _as_arrays(X, y)
-        idx = _select_signals(X, y, concentration, n_traces=n_traces, rng=rng)
+        
+        if concentration is not None:
+            idx = _select_signals(X, y, concentration, n_traces=n_traces, rng=rng)
+        else:
+            # Pick random signals across all generated data
+            max_gen = len(X)
+            n_gen = max_gen if n_traces is None else min(n_traces, max_gen)
+            idx = rng.choice(max_gen, n_gen, replace=False)
+            
         for k, i in enumerate(idx):
             fig.add_trace(go.Scatter(
                 x=E, y=X[i], mode='lines', line=dict(color=colors[name], width=1.0),
                 opacity=0.45, name=name, legendgroup=name, showlegend=(k == 0)))
 
-    apply_default_plotly_layout(fig, title or f'Signal overlay near c = {concentration} µM')
+    default_title = f'Signal overlay near c = {concentration} µM' if concentration is not None else 'Signal overlay (All Concentrations)'
+    apply_default_plotly_layout(fig, title or default_title)
     return fig
 
 
