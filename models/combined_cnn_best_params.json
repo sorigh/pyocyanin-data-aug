@@ -1,0 +1,25 @@
+{
+  "cnn": {
+    "best_params": {
+      "lr": 0.0018495216589727262,
+      "n_conv_layers": 3,
+      "base_filters": 16,
+      "kernel_size": 9,
+      "dropout": 0.10663513157114246,
+      "fc_hidden": 64,
+      "batch_size": 32,
+      "weight_decay": 2.585608890731339e-06
+    },
+    "best_epoch": 49,
+    "val_mae_uM": 1.3279483318328857,
+    "n_trials": 30,
+    "n_pruned": 8,
+    "n_train": 752,
+    "n_val": 188,
+    "signals_csv": "raw/combined_all_raw_signals.csv",
+    "signal_len": 229,
+    "nested_cv_mae": 2.7626651833824654,
+    "nested_cv_rmse": 6.904928353941409,
+    "nested_cv_r2": 0.8997818742436277
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "svr": {
+    "search_method": "bayes",
+    "best_params": {
+      "svr__C": 115.33999859559563,
+      "svr__epsilon": 0.0036927778279520333,
+      "svr__gamma": 0.09777670269847542
+    },
+    "final_search_cv_mae": 0.9943179915211791,
+    "nested_cv_mae": 0.9677659272791247,
+    "nested_cv_rmse": 2.7995590999739384,
+    "nested_cv_r2": 0.9837926652677004,
+    "n_samples": 600,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/gan_only_core.csv"
+  },
+  "xgboost": {
+    "search_method": "bayes",
+    "best_params": {
+      "xgbregressor__colsample_bytree": 0.8468317434009265,
+      "xgbregressor__gamma": 0.055573976597875704,
+      "xgbregressor__learning_rate": 0.03390942329293072,
+      "xgbregressor__max_depth": 7,
+      "xgbregressor__min_child_weight": 6,
+      "xgbregressor__n_estimators": 318,
+      "xgbregressor__reg_alpha": 0.00690235969313502,
+      "xgbregressor__reg_lambda": 0.048789946714619455,
+      "xgbregressor__subsample": 0.8935529941075223
+    },
+    "final_search_cv_mae": 0.9270824229589761,
+    "nested_cv_mae": 0.9230078504298606,
+    "nested_cv_rmse": 2.6717026198258464,
+    "nested_cv_r2": 0.9852392455987516,
+    "n_samples": 600,
+    "n_features": 4,
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM"
+    ],
+    "features_csv": "vectorized/gan_only_core.csv"
+  }
+}

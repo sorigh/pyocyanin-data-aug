@@ -217,4 +217,7 @@ results
 gan_output
 *.joblib
 logs
-models
+
+# models/: keep hyperparameter/config/metadata JSON files versioned (small,
+# useful provenance), ignore only the trained weight files themselves.
+models/**/*.pt

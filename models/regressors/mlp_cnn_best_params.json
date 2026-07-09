@@ -1,0 +1,64 @@
+{
+  "mlp": {
+    "best_params": {
+      "lr": 0.003336101309469784,
+      "n_layers": 1,
+      "hidden_0": 16,
+      "dropout": 0.13611590802176332,
+      "batch_size": 4,
+      "weight_decay": 5.924870051994317e-05
+    },
+    "best_epoch": 35,
+    "val_mae_uM": 0.4065144293536303,
+    "n_trials": 100,
+    "n_pruned": 11,
+    "n_train": 32,
+    "n_val": 8,
+    "features_csv": "vectorized/experimental.csv",
+    "feature_columns": [
+      "peak_current",
+      "peak_potential",
+      "peak_AUC",
+      "peak_FWHM",
+      "pca1_comp",
+      "first_derivative_max",
+      "second_derivative_min",
+      "left_slope",
+      "right_slope",
+      "asymetry",
+      "peak_sharpness",
+      "peak_compactness",
+      "current_variance",
+      "peak_skewness",
+      "peak_kurtosis",
+      "tchebichef_curve_moments",
+      "mean_peak",
+      "signal_entropy",
+      "spectral_entropy",
+      "fft_power",
+      "pca2_comp",
+      "pca3_comp",
+      "wavelet_energy"
+    ]
+  },
+  "cnn": {
+    "best_params": {
+      "lr": 0.005867953705629066,
+      "n_conv_layers": 3,
+      "base_filters": 16,
+      "kernel_size": 9,
+      "dropout": 0.37435044417008234,
+      "fc_hidden": 64,
+      "batch_size": 16,
+      "weight_decay": 3.657236861819232e-05
+    },
+    "best_epoch": 62,
+    "val_mae_uM": 0.34307390451431274,
+    "n_trials": 100,
+    "n_pruned": 21,
+    "n_train": 32,
+    "n_val": 8,
+    "signals_csv": "raw/raw_signals_real.csv",
+    "signal_len": 229
+  }
+}
