@@ -66,6 +66,31 @@ MODEL_EVALUATION_RESULTS_CSV = RESULTS_DIR / 'model_evaluation_results.csv'
 AUGMENTATION_ABLATION_RESULTS_CSV = RESULTS_DIR / 'augmentation_ablation_results.csv'
 FULL_RANGE_ABLATION_RESULTS_CSV = RESULTS_DIR / 'full_range_ablation_results_refined.csv'
 
+# Per-condition datasets built by prepare_condition_datasets.py for the
+# run_condition_sweep.py.
+CONDITIONS_DIR = VECTORIZED_DIR / 'conditions'
+FEATURE_SUITES = ('core', 'extended', 'experimental')
+GAN_ONLY_RAW_SIGNALS_CSV = CONDITIONS_DIR / 'gan_only_raw_signals.csv'
+COMBINED_ALL_RAW_SIGNALS_CSV = CONDITIONS_DIR / 'combined_all_raw_signals.csv'
+
+
+def gan_only_features_csv(suite: str) -> Path:
+    return CONDITIONS_DIR / f'gan_only_{suite}.csv'
+
+
+def combined_all_features_csv(suite: str) -> Path:
+    return CONDITIONS_DIR / f'combined_all_{suite}.csv'
+
+
+# Results tables produced by run_condition_sweep.py
+CONDITIONS_RESULTS_DIR = RESULTS_DIR / 'conditions'
+CONDITION_NAMES = ('lab', 'physics_aug', 'gan', 'combined')
+FEATURE_COUNT_ACCURACY_MATRIX_CSV = CONDITIONS_RESULTS_DIR / 'feature_count_accuracy_matrix.csv'
+
+
+def condition_best_models_csv(condition: str) -> Path:
+    return CONDITIONS_RESULTS_DIR / f'{condition}_best_models.csv'
+
 # logs
 LOGS_DIR = ROOT / 'logs'
 TUNE_DL_HPARAMS_STUDIES_CSV = LOGS_DIR / 'tune_dl_hparams_studies.csv'

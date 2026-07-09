@@ -24,4 +24,5 @@ dependencies = [
     "sdv>=1.36.0",
     "POT>=0.9.5",
     "streamlit>=1.58.0",
+    "shap>=0.52.0",
 ]
