@@ -170,6 +170,17 @@ def format_source_option(key: str, sources: dict) -> str:
     return f"{s['label']} (n={s['n']})"
 
 
+def dataset_to_csv_bytes(X: np.ndarray, y: np.ndarray) -> bytes:
+    """Serialize a (X, y) signal batch to CSV bytes in the same on-disk shape
+    as raw_signals_real.csv / augmented_signals.csv: a 'concentration' column
+    followed by one I_<i> column per potential-grid point.
+    """
+    X = np.asarray(X, dtype=float)
+    df = pd.DataFrame(X, columns=[f'I_{i}' for i in range(X.shape[1])])
+    df.insert(0, 'concentration', np.asarray(y, dtype=float))
+    return df.to_csv(index=False).encode('utf-8')
+
+
 def combine_sources(keys: Sequence[str], sources: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Concatenate the chosen sources into one (E, X, y) batch.
 

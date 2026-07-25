@@ -365,16 +365,23 @@ def render_save_to_session(d: dict) -> None:
     st.subheader('Use this dataset on the Model Training & Testing page')
     n = len(d['sources']['Physics-Augmented'][0])
     st.caption(f'Saves the **Physics-Augmented** batch above (n={n}, seed={d["config_used"].rng_seed}) into this '
-               'session so it shows up as "Custom generated" in the training-data picker on the other page. '
-               'Generating a new batch here and saving again overwrites the previous save.')
-    if st.button('Save this dataset for Model Training', type='primary'):
-        X, y = d['sources']['Physics-Augmented']
-        dr.save_dataset_to_session(
-            'custom_generated', d['E'], X, y,
-            meta={'origin': 'Data Generation page (physics-informed)',
-                  'config': dataclasses.asdict(d['config_used']),
-                  'generated_at': datetime.now().isoformat(timespec='seconds')})
-        st.success(f'Saved {n} signals as "Custom generated" - switch to the Model Training & Testing page to use them.')
+               'session so it shows up as "Custom generated" in the training-data picker on the other page, or '
+               'download it as a CSV. Generating a new batch here and saving again overwrites the previous save.')
+    X, y = d['sources']['Physics-Augmented']
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button('Save this dataset for Model Training', type='primary', width='stretch'):
+            dr.save_dataset_to_session(
+                'custom_generated', d['E'], X, y,
+                meta={'origin': 'Data Generation page (physics-informed)',
+                      'config': dataclasses.asdict(d['config_used']),
+                      'generated_at': datetime.now().isoformat(timespec='seconds')})
+            st.success(f'Saved {n} signals as "Custom generated" - switch to the Model Training & Testing page to use them.')
+    with col2:
+        st.download_button(
+            'Download dataset as CSV', data=dr.dataset_to_csv_bytes(X, y),
+            file_name=f'physics_augmented_seed{d["config_used"].rng_seed}_n{n}.csv',
+            mime='text/csv', width='stretch')
 
 
 def render_dashboard(d: dict) -> None:
@@ -476,16 +483,25 @@ def render_gan_generation_tab() -> None:
             st.dataframe(pd.DataFrame({'concentration': preview['y_gen']}).describe(), width='stretch')
 
         st.caption('Saves this GAN batch into the session so it shows up as "GAN synthetic" in the '
-                   'training-data picker on the Model Training & Testing page. Generating again and '
-                   're-saving overwrites the previous save.')
-        if st.button('Save this GAN dataset for Model Training', type='primary', key='save_gan_dataset'):
-            dr.save_dataset_to_session(
-                'gan_generated', preview['E'], preview['X_gen'], preview['y_gen'],
-                meta={'origin': f'Data Generation page (GAN: {preview["architecture"]})',
-                      'checkpoint': preview['checkpoint_label'], 'seed': preview['seed'],
-                      'generated_at': datetime.now().isoformat(timespec='seconds')})
-            st.success(f'Saved {preview["n"]} signals as "GAN synthetic" - switch to the Model Training '
-                       '& Testing page to use them.')
+                   'training-data picker on the Model Training & Testing page, or download it as a CSV. '
+                   'Generating again and re-saving overwrites the previous save.')
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button('Save this GAN dataset for Model Training', type='primary', key='save_gan_dataset',
+                         width='stretch'):
+                dr.save_dataset_to_session(
+                    'gan_generated', preview['E'], preview['X_gen'], preview['y_gen'],
+                    meta={'origin': f'Data Generation page (GAN: {preview["architecture"]})',
+                          'checkpoint': preview['checkpoint_label'], 'seed': preview['seed'],
+                          'generated_at': datetime.now().isoformat(timespec='seconds')})
+                st.success(f'Saved {preview["n"]} signals as "GAN synthetic" - switch to the Model Training '
+                           '& Testing page to use them.')
+        with col2:
+            safe_checkpoint = preview['checkpoint_label'].lower().replace(' ', '_')
+            st.download_button(
+                'Download dataset as CSV', data=dr.dataset_to_csv_bytes(preview['X_gen'], preview['y_gen']),
+                file_name=f'{preview["architecture"].lower()}_{safe_checkpoint}_n{preview["n"]}.csv',
+                mime='text/csv', width='stretch', key='download_gan_dataset')
 
 
 # Section 5 - page entry point

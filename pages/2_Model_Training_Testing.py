@@ -24,13 +24,12 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from scipy.spatial.distance import pdist, squareform
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import KFold, LeaveOneOut
 
 import data_registry as dr
 import sweep_registry
-from augmentation_pipeline import AugmentationConfig, FEATURE_COLUMNS_BY_SUITE, FeatureVectorizer, SignalAugmentor
+from augmentation_pipeline import FEATURE_COLUMNS_BY_SUITE
 
 
 from model_registry import MODEL_FACTORIES, MODEL_LABELS, RAW_SIGNAL_MODELS, predict, train_models
@@ -40,10 +39,8 @@ from voltammogram_signal import Signal
 import paths
 
 PRETRAINED_MODELS_DIR = paths.REGRESSORS_DIR
-RECOMMENDED = AugmentationConfig()
 FOOLED_PCT_THRESHOLD = 40.0
 BORDERLINE_PCT_THRESHOLD = 15.0
-LEAKAGE_NN_SAMPLE_CAP = 800  # bound the O(n^2) leave-one-out distance computation
 
 LOO_MAX_N = 50  # true LeaveOneOut only below this row count
 EXPENSIVE_MODELS = RAW_SIGNAL_MODELS | {'mlp'}  # cnn + mlp: never true LOO, always k-fold
@@ -226,7 +223,10 @@ def render_training_module(sources: dict) -> None:
                  'spectral features (23). Defaults to core. Ignored by 1D-CNN, which always trains on '
                  'the raw signal regardless of this choice.')
 
-    model_keys = st.multiselect('Algorithms to train', options=list(MODEL_LABELS), default=list(MODEL_LABELS),
+    # xgboost_tuned is a fixed ablation-study baseline (model_registry.py), never
+    # produced by run_condition_sweep.py's ML_MODELS list
+    model_options = [k for k in MODEL_LABELS if not (hp_mode == 'sweep' and k == 'xgboost_tuned')]
+    model_keys = st.multiselect('Algorithms to train', options=model_options, default=['ridge'],
                                  format_func=lambda k: MODEL_LABELS[k])
     if any(k in RAW_SIGNAL_MODELS for k in model_keys):
         st.caption('1D-CNN ignores the feature suite above - it always trains on the raw 229-point signal.')
@@ -408,11 +408,8 @@ def run_leave_out_evaluation(bundle: dict, model_name: str, test_key: str, sourc
                 metrics=compute_regression_metrics(y_true_arr, y_pred_arr), feat_df=feat_df)
 
 
-def render_dataset_test(bundle: dict, model_name: str, sources: dict) -> None:
+def render_dataset_test(bundle: dict, model_name: str, sources: dict, test_key: str) -> None:
     st.subheader('Test on an entire dataset')
-    available_keys = [k for k in DATASET_SOURCE_KEYS if sources[k]['available']]
-    test_key = st.selectbox('Dataset to test', options=available_keys,
-                             format_func=lambda k: dr.format_source_option(k, sources), key='test_dataset_key')
 
     is_leaky = test_key in bundle['train_source_keys']
     leave_out_checked = False
@@ -488,83 +485,9 @@ def render_dataset_test(bundle: dict, model_name: str, sources: dict) -> None:
         st.dataframe(result['feat_df'].head(10), width='stretch', hide_index=True)
 
 
-def render_manual_augmentation_controls() -> tuple[float, AugmentationConfig, bool]:
-    st.caption('Manually tune the same physics-informed augmentation ingredients used on the Data '
-               'Generation page - one signal at a time.')
-    conc_grid = [round(float(c), 3) for c in np.geomspace(0.1, 100.0, 60)]
-    default_c = min(conc_grid, key=lambda c: abs(c - 10.0))
-    target_c = st.select_slider('Target concentration (uM) - the "expected" value',
-                                 options=conc_grid, value=default_c, key='manual_target_c')
-
-    col1, col2 = st.columns(2)
-    with col1:
-        use_pchip = st.checkbox('PCHIP-corrected interpolation (vs linear)',
-                                 value=RECOMMENDED.use_pchip, key='m_use_pchip')
-        use_lw_noise = st.checkbox('Long & Winefordner noise model (vs constant sigma)',
-                                    value=RECOMMENDED.use_lw_noise, key='m_use_lw_noise')
-        noise_sigma_const_uA = st.slider(
-            'Constant noise sigma (uA) - used only when L&W is off',
-            min_value=0.0, max_value=0.02, value=RECOMMENDED.noise_sigma_const_uA,
-            step=0.0005, format='%.4f', key='m_noise_sigma', disabled=use_lw_noise)
-        snr_floor = st.slider('SNR floor', min_value=1.0, max_value=10.0,
-                               value=RECOMMENDED.snr_floor, step=0.1, key='m_snr_floor',
-                               help='Caps how noisy the peak region is allowed to get: peak current / '
-                                    'noise never drops below this ratio.')
-    with col2:
-        enable_baseline = st.checkbox('Concentration-scaled baseline distortion',
-                                       value=RECOMMENDED.enable_baseline, key='m_enable_baseline')
-        baseline_amp_max_uA = st.slider(
-            'Max baseline amplitude (uA)', min_value=0.0, max_value=0.15,
-            value=RECOMMENDED.baseline_amp_max_uA, step=0.005, format='%.3f',
-            key='m_baseline_amp', disabled=not enable_baseline)
-        enable_drift = st.checkbox('Horizontal potential drift',
-                                    value=RECOMMENDED.enable_drift, key='m_enable_drift')
-        drift_sigma_V = st.slider(
-            'Drift sigma (V)', min_value=0.0, max_value=0.02,
-            value=RECOMMENDED.potential_drift_sigma_low_V, step=0.001, format='%.3f',
-            key='m_drift_sigma', disabled=not enable_drift)
-
-    seed = st.number_input('Random seed', min_value=0, max_value=10_000, value=42, step=1, key='m_seed')
-    generate_clicked = st.button('⚡ Generate / regenerate test signal', type='primary', width='stretch')
-
-    config = AugmentationConfig(
-        use_pchip=use_pchip, use_lw_noise=use_lw_noise, noise_sigma_const_uA=noise_sigma_const_uA,
-        snr_floor=snr_floor, enable_baseline=enable_baseline, baseline_amp_max_uA=baseline_amp_max_uA,
-        baseline_scale_c_ref_uM=RECOMMENDED.baseline_scale_c_ref_uM, enable_drift=enable_drift,
-        potential_drift_sigma_low_V=drift_sigma_V, potential_drift_sigma_high_V=drift_sigma_V,
-        rng_seed=int(seed),
-    )
-    return target_c, config, generate_clicked
-
-
-def generate_and_extract(target_c: float, config: AugmentationConfig, augmentor, suite: str
-                          ) -> tuple[np.ndarray, Signal, list]:
-    np.random.seed(config.rng_seed)
-    augmentor.noise_model.snr_floor = config.snr_floor
-    signal_augmentor = SignalAugmentor(augmentor.calibration, augmentor.ip_spline, augmentor.noise_model, config)
-    I = signal_augmentor.generate_signal(target_c)
-
-    Signal.set_common_potential_E(augmentor.calibration.potential_grid_V)
-    Signal.set_common_baseline_I(np.array([]))  # anchor curves (and thus I) are already baseline-subtracted
-    try:
-        sig = Signal(I)  # still needed for the peak plot regardless of suite
-        if suite == 'raw_signal':
-            # The 1D-CNN trains directly on raw/raw_signals_real.csv's values
-            # (see data_registry.featurize's 'raw_signal' branch) - Signal's
-            # constructor Savitzky-Golay-smooths self.I for peak detection,
-            # so using that here instead of the true raw I would be a
-            # train/inference mismatch.
-            feature_vector = I.tolist()
-        else:
-            feature_vector = FeatureVectorizer.vectorize(sig, suite=suite)
-    finally:
-        Signal.set_common_baseline_I(augmentor.calibration.blank_baseline_uA)
-    return I, sig, feature_vector
-
-
 def plot_generated_signal(E: np.ndarray, I: np.ndarray, peak) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=E, y=I, mode='lines', name='Generated signal',
+    fig.add_trace(go.Scatter(x=E, y=I, mode='lines', name='Signal',
                               line=dict(color='#111111', width=2)))
     fig.add_trace(go.Scatter(
         x=E[peak.start_idx:peak.end_idx + 1], y=I[peak.start_idx:peak.end_idx + 1],
@@ -572,94 +495,58 @@ def plot_generated_signal(E: np.ndarray, I: np.ndarray, peak) -> go.Figure:
         line=dict(color='#17becf'), fillcolor='rgba(23,190,207,0.25)'))
     fig.add_trace(go.Scatter(x=[peak.Ep], y=[peak.Ip], mode='markers', name='Peak (Ip, Ep)',
                               marker=dict(color='#e34a1a', size=11, symbol='diamond')))
-    return apply_default_plotly_layout(fig, title_text='Manually augmented test signal')
+    return apply_default_plotly_layout(fig, title_text='Selected signal')
 
 
-def check_single_signal_leakage(feature_vector: list, target_c: float, bundle: dict, model_name: str
-                                 ) -> tuple[bool, str]:
-    """Nearest-neighbour-in-feature-space + exact-concentration leakage check.
-
-    Flags the manually generated signal as a likely leak if either (a) its
-    target concentration exactly matches one already in the training set, or
-    (b) it sits closer to some training row than that training set's own
-    typical (25th-percentile) nearest-neighbour distance.
-
-    Runs in whichever representation `model_name` actually uses (engineered
-    features, or the raw 229-point signal for 'cnn')
-    """
-    suite = bundle['model_suites'][model_name]
-    train_features = bundle['train_features'][suite]
-    feature_columns = bundle['feature_columns'][suite]
-    X_train = train_features[feature_columns].to_numpy(dtype=float)
-
-    concentrations = train_features['concentration'].to_numpy(dtype=float)
-    if np.any(np.isclose(concentrations, target_c, rtol=1e-6)):
-        return True, f'the target concentration {target_c:g} uM is identical to one already in the training set'
-
-    mu, sigma = X_train.mean(axis=0), X_train.std(axis=0)
-    sigma[sigma == 0] = 1.0
-    Xz = (X_train - mu) / sigma
-    vz = (np.asarray(feature_vector, dtype=float) - mu) / sigma
-    min_dist = float(np.linalg.norm(Xz - vz, axis=1).min())
-
-    if len(Xz) < 2:
-        return False, ''
-
-    sample = Xz
-    if len(Xz) > LEAKAGE_NN_SAMPLE_CAP:
-        rng = np.random.RandomState(0)
-        sample = Xz[rng.choice(len(Xz), LEAKAGE_NN_SAMPLE_CAP, replace=False)]
-    D = squareform(pdist(sample))
-    np.fill_diagonal(D, np.inf)
-    threshold = float(np.percentile(D.min(axis=1), 25))
-
-    if min_dist <= threshold:
-        return True, (f"this signal's features sit closer to a training example (z-distance {min_dist:.2f}) "
-                       f'than training examples typically sit to their own nearest neighbour '
-                       f'(threshold {threshold:.2f})')
-    return False, ''
+@st.cache_data(show_spinner=False)
+def _featurize_cached(E: np.ndarray, X: np.ndarray, y: np.ndarray, suite: str) -> pd.DataFrame:
+    return dr.featurize(E, X, y, suite=suite)
 
 
-def render_single_signal_test(bundle: dict, model_name: str) -> None:
-    st.subheader('Generate a single new signal')
-    augmentor = dr.load_augmentor()
-    target_c, config, generate_clicked = render_manual_augmentation_controls()
+def render_single_point_test(bundle: dict, model_name: str, sources: dict, test_key: str) -> None:
+    st.subheader('Inspect a single signal from this dataset')
+    st.caption('One real row from the dataset selected above - no synthetic generation, just how this '
+               'model scores an actual signal from that data.')
 
+    is_leaky = test_key in bundle['train_source_keys']
+    if is_leaky:
+        st.warning(f"Warning! Possible **Data leakage:** {sources[test_key]['label']} was part of this "
+                   "model's training data - a strong prediction here reflects memorization, not "
+                   "generalization. Pick an independent dataset above for an honest single-signal check.")
+
+    s = sources[test_key]
     suite = bundle['model_suites'][model_name]
     feature_columns = bundle['feature_columns'][suite]
     imputer = bundle['imputers'][suite]
 
-    state_key = f"single_signal_{bundle['run_id']}_{suite}"
-    if generate_clicked or state_key not in st.session_state:
-        try:
-            I, sig, feature_vector = generate_and_extract(target_c, config, augmentor, suite)
-            st.session_state[state_key] = dict(E=augmentor.calibration.potential_grid_V, I=I, peak=sig.peak,
-                                                target_c=target_c, feature_vector=feature_vector)
-        except ValueError:
-            st.warning(f"WARNING! At {target_c:g} uM the peak is too small/noisy to reliably measure (fewer than "
-                       "2 points cross the 50% threshold, so FWHM can't be computed). Try a higher target "
-                       "concentration, a higher SNR floor, or disabling extra baseline/drift noise.")
-            if state_key not in st.session_state:
-                return
-    last = st.session_state[state_key]
+    feat_df = _featurize_cached(s['E'], s['X'], s['y'], suite)
+    row_order = np.argsort(feat_df['concentration'].to_numpy(dtype=float)).tolist()
+    row_idx = st.selectbox(
+        'Signal to inspect', options=row_order,
+        format_func=lambda i: f"Row {i} - {feat_df['concentration'].iloc[i]:g} uM", key='single_point_row_idx')
 
-    X_row = pd.DataFrame([last['feature_vector']], columns=feature_columns)
+    I = np.asarray(s['X'][row_idx], dtype=float)
+    target_c = float(s['y'][row_idx])
+    feature_vector = feat_df.iloc[row_idx][feature_columns].tolist()
+
+    Signal.set_common_potential_E(s['E'])
+    Signal.set_common_baseline_I(np.array([]))  # dataset signals are already baseline-subtracted
+    try:
+        sig = Signal(I)
+    finally:
+        Signal.set_common_baseline_I(np.zeros_like(s['E']))
+
+    X_row = pd.DataFrame([feature_vector], columns=feature_columns)
     predicted_c = float(predict(bundle['models'][model_name], imputer, X_row)[0])
-
-    is_leaky, reason = check_single_signal_leakage(last['feature_vector'], last['target_c'], bundle, model_name)
-    if is_leaky:
-        st.warning(f"WARNING! **Possible leakage:** {reason}. Tweak the target concentration or the noise / "
-                   "baseline / drift settings further so this test signal is clearly independent from "
-                   "the training data.")
 
     left, right = st.columns([3, 2])
     with left:
-        st.plotly_chart(plot_generated_signal(last['E'], last['I'], last['peak']), width='stretch')
+        st.plotly_chart(plot_generated_signal(s['E'], I, sig.peak), width='stretch')
     with right:
-        abs_pct_error = 100 * abs(predicted_c - last['target_c']) / last['target_c']
-        st.metric('Expected concentration (uM)', f"{last['target_c']:.3f}")
+        abs_pct_error = 100 * abs(predicted_c - target_c) / target_c
+        st.metric('Expected concentration (uM)', f'{target_c:.3f}')
         st.metric(f"{MODEL_LABELS.get(model_name, model_name)} prediction (uM)", f'{predicted_c:.3f}',
-                  delta=f'{predicted_c - last["target_c"]:+.3f} uM')
+                  delta=f'{predicted_c - target_c:+.3f} uM')
         st.metric('Absolute error', f'{abs_pct_error:.1f}%')
 
         if abs_pct_error < BORDERLINE_PCT_THRESHOLD:
@@ -670,14 +557,13 @@ def render_single_signal_test(bundle: dict, model_name: str) -> None:
             st.error('**Verdict:** model was fooled - prediction is far from the target.')
 
         if st.button('+ Add to comparison history', width='stretch'):
-            row = dict(model=MODEL_LABELS.get(model_name, model_name), expected=last['target_c'],
+            row = dict(model=MODEL_LABELS.get(model_name, model_name), expected=target_c,
                        predicted=predicted_c, abs_pct_error=abs_pct_error)
             st.session_state.setdefault('test_history', []).append(row)
 
     st.caption('Raw signal the model is evaluating for this signal:' if suite == 'raw_signal' else
                'Features the model is evaluating for this signal:')
-    st.dataframe(pd.DataFrame([last['feature_vector']], columns=feature_columns),
-                 width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame([feature_vector], columns=feature_columns), width='stretch', hide_index=True)
 
     if st.session_state.get('test_history'):
         st.subheader('Comparison history (this session)')
@@ -704,19 +590,26 @@ def render_testing_module(sources: dict) -> None:
 
     render_transparency_card(bundle, model_name)
 
-    test_mode = st.radio('Test mode', options=['Test an entire dataset', 'Generate a single new signal'],
+    available_keys = [k for k in DATASET_SOURCE_KEYS if sources[k]['available']]
+    if not available_keys:
+        st.warning('No datasets available to test on yet - build one on the Data Generation page first.')
+        return
+    test_key = st.selectbox('Dataset to test', options=available_keys,
+                             format_func=lambda k: dr.format_source_option(k, sources), key='test_dataset_key')
+
+    test_mode = st.radio('Test mode', options=['Test an entire dataset', 'Inspect a single signal'],
                           horizontal=True, key='test_mode')
     if test_mode == 'Test an entire dataset':
-        render_dataset_test(bundle, model_name, sources)
+        render_dataset_test(bundle, model_name, sources, test_key)
     else:
-        render_single_signal_test(bundle, model_name)
+        render_single_point_test(bundle, model_name, sources, test_key)
 
 
 # Section 4 - page entry point
 def main() -> None:
     st.title(' Model Training & Testing')
     st.caption('Choose exactly what data and feature suite a model learns from, then test it '
-               'transparently against a whole dataset or a single hand-tuned signal.')
+               'transparently against a whole dataset or a single signal drawn from it.')
 
     sources = dr.get_available_sources()
     init_trained_runs(sources)
